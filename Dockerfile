@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+RUN ls -R .
 RUN npm run build
 
 # Stage 2: Run Backend
