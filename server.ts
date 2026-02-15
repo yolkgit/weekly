@@ -30,14 +30,14 @@ app.post('/api/auth/signup', async (req, res) => {
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
         console.log("Checking for existing user...");
-        const existingUser = await prisma.user.findUnique({ where: { email } });
+        const existingUser = await (prisma as any).user.findUnique({ where: { email } });
         if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
         console.log("Hashing password...");
         const hashedPassword = await bcrypt.hash(password, 10);
 
         console.log("Creating user in DB...");
-        const user = await prisma.user.create({
+        const user = await (prisma as any).user.create({
             data: { email, password: hashedPassword }
         });
 
@@ -58,7 +58,7 @@ app.post('/api/auth/login', async (req, res) => {
         const { email, password } = req.body;
 
         console.log("Finding user...");
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await (prisma as any).user.findUnique({ where: { email } });
         if (!user) return res.status(400).json({ error: 'User not found' });
 
         console.log("Comparing password...");
@@ -82,8 +82,8 @@ app.post('/api/auth/parent-password', authenticateToken, async (req: AuthRequest
     }
 
     try {
-        await prisma.user.update({
-            where: { id: req.user!.id },
+        await (prisma as any).user.update({
+            where: { id: (req as any).user!.id },
             data: { parentPassword }
         });
         res.json({ success: true });
@@ -95,14 +95,14 @@ app.post('/api/auth/parent-password', authenticateToken, async (req: AuthRequest
 // --- Snapshot API (Protected) ---
 
 app.get('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
-    const { childId } = req.query;
+    const childId = req.query.childId as string | undefined;
     try {
-        const whereClause: any = { child: { userId: req.user!.id } };
-        if (childId && typeof childId === 'string') {
+        const whereClause: any = { child: { userId: (req as any).user!.id } };
+        if (childId) {
             whereClause.childId = childId;
         }
 
-        const snapshots = await prisma.scheduleSnapshot.findMany({
+        const snapshots = await (prisma as any).scheduleSnapshot.findMany({
             where: whereClause,
             orderBy: { createdAt: 'desc' }
         });
@@ -117,12 +117,12 @@ app.post('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
     try {
         // Verify child owns by user
         const child = await prisma.child.findFirst({
-            where: { id: childId, userId: req.user!.id }
+            where: { id: childId as string, user: { id: (req as any).user!.id } }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
-        const snapshot = await prisma.scheduleSnapshot.create({
-            data: { childId, name, date, schedule }
+        const snapshot = await (prisma as any).scheduleSnapshot.create({
+            data: { childId: childId as string, name, date, schedule }
         });
         res.json(snapshot);
     } catch (e) {
@@ -132,12 +132,12 @@ app.post('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
 
 app.delete('/api/snapshots/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
-        const snapshot = await prisma.scheduleSnapshot.findFirst({
-            where: { id: req.params.id, child: { userId: req.user!.id } }
+        const snapshot = await (prisma as any).scheduleSnapshot.findFirst({
+            where: { id: req.params.id as string, child: { userId: (req as any).user!.id } }
         });
         if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
 
-        await prisma.scheduleSnapshot.delete({ where: { id: req.params.id } });
+        await (prisma as any).scheduleSnapshot.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to delete snapshot' });
@@ -149,9 +149,9 @@ app.delete('/api/snapshots/:id', authenticateToken, async (req: AuthRequest, res
 
 app.get('/api/children', authenticateToken, async (req: AuthRequest, res) => {
     try {
-        console.log(`Fetching children for user: ${req.user!.id} (${req.user!.email})`);
+        console.log(`Fetching children for user: ${(req as any).user!.id}`);
         const children = await prisma.child.findMany({
-            where: { userId: req.user!.id },
+            where: { user: { id: (req as any).user!.id } },
             include: {
                 rewardConfig: true
             },
@@ -171,7 +171,7 @@ app.post('/api/children', authenticateToken, async (req: AuthRequest, res) => {
 
         const child = await prisma.child.create({
             data: {
-                userId: req.user!.id, // Link to user
+                userId: (req as any).user!.id, // Link to user
                 name,
                 color,
                 grade,
@@ -197,23 +197,23 @@ app.put('/api/children/:id', authenticateToken, async (req: AuthRequest, res) =>
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id, userId: req.user!.id }
+            where: { id: id as string, user: { id: (req as any).user!.id } } as any
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
         const { name, color, grade, startTime, endTime, isPlanConfirmed } = data;
 
         const updated = await prisma.child.update({
-            where: { id },
+            where: { id: id as string },
             data: {
                 name,
                 color,
                 grade,
-                startTime,
-                endTime,
-                isPlanConfirmed,
+                startTime: startTime as string,
+                endTime: endTime as string,
+                isPlanConfirmed: !!isPlanConfirmed,
                 updatedAt: new Date()
-            }
+            } as any
         });
         res.json(updated);
     } catch (error) {
@@ -227,11 +227,11 @@ app.delete('/api/children/:id', authenticateToken, async (req: AuthRequest, res)
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id, userId: req.user!.id }
+            where: { id: id as string, user: { id: (req as any).user!.id } } as any
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
-        await prisma.child.delete({ where: { id } });
+        await prisma.child.delete({ where: { id: id as string } });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete child' });
@@ -241,14 +241,14 @@ app.delete('/api/children/:id', authenticateToken, async (req: AuthRequest, res)
 // --- Schedule API (Protected) ---
 
 app.get('/api/schedules', authenticateToken, async (req: AuthRequest, res) => {
-    const { childId } = req.query;
-    if (!childId || typeof childId !== 'string') {
+    const childId = req.query.childId as string | undefined;
+    if (!childId) {
         return res.status(400).json({ error: 'Child ID required' });
     }
 
     // Verify ownership
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: req.user!.id }
+        where: { id: childId, user: { id: (req as any).user!.id } } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -303,9 +303,9 @@ app.post('/api/schedules/batch', authenticateToken, async (req: AuthRequest, res
             // If it's a new slot from frontend with UUID, we definitely want to use that ID.
             if (slot.id) {
                 return prisma.timeSlot.upsert({
-                    where: { id: slot.id },
+                    where: { id: slot.id as string },
                     update: { ...data, updatedAt: new Date() },
-                    create: { ...data, id: slot.id } // Use the provided ID!
+                    create: { ...data, id: slot.id as string } // Use the provided ID!
                 });
             } else {
                 // Fallback for missing ID (shouldn't happen with updated frontend)
@@ -325,15 +325,15 @@ app.delete('/api/schedules/:id', authenticateToken, async (req: AuthRequest, res
     try {
         // Need to find if slot belongs to a child of this user
         const slot = await prisma.timeSlot.findUnique({
-            where: { id: req.params.id },
+            where: { id: req.params.id as string },
             include: { child: true }
         });
 
-        if (!slot || slot.child.userId !== req.user!.id) {
+        if (!slot || (slot.child as any).userId !== (req as any).user!.id) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        await prisma.timeSlot.delete({ where: { id: req.params.id } });
+        await prisma.timeSlot.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete schedule slot' });
@@ -345,7 +345,7 @@ app.delete('/api/schedules/all/:childId', authenticateToken, async (req: AuthReq
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id: childId, userId: req.user!.id }
+            where: { id: childId, userId: (req as any).user!.id }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -359,11 +359,11 @@ app.delete('/api/schedules/all/:childId', authenticateToken, async (req: AuthReq
 // --- Logs & Points (Protected) ---
 
 app.get('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
-    const { childId } = req.query;
-    if (typeof childId !== 'string') return res.status(400).json([]);
+    const childId = req.query.childId as string | undefined;
+    if (!childId) return res.status(400).json([]);
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: req.user!.id }
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -396,10 +396,10 @@ app.post('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => {
-    const { childId } = req.body;
+    const childId = req.body.childId as string | undefined;
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: req.user!.id }
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -414,33 +414,18 @@ app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => 
 // --- Reward Config (Protected) ---
 
 app.get('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
+    const childId = req.params.childId as string;
     const child = await prisma.child.findFirst({
-        where: { id: req.params.childId, userId: req.user!.id }
-    });
-    if (!child) return res.status(403).json({ error: 'Unauthorized' });
-
-    try {
-        const config = await prisma.rewardConfig.findUnique({
-            where: { childId: req.params.childId }
-        });
-        res.json(config);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed config' });
-    }
-});
-
-app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
-    const child = await prisma.child.findFirst({
-        where: { id: req.params.childId, userId: req.user!.id }
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
     const data = req.body;
     try {
         const config = await prisma.rewardConfig.upsert({
-            where: { childId: req.params.childId },
+            where: { childId: childId },
             update: { ...data },
-            create: { childId: req.params.childId, ...data }
+            create: { childId: childId, ...data }
         });
         res.json(config);
     } catch (e) {
