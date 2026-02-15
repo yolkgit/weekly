@@ -17,7 +17,7 @@ import { getScheduleAdvice } from './services/geminiService';
 import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen } from 'lucide-react';
 
 import { api } from './services/api';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { LogOut } from 'lucide-react';
 
 // Colors for children profiles
