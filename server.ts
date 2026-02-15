@@ -117,7 +117,7 @@ app.post('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
     try {
         // Verify child owns by user
         const child = await prisma.child.findFirst({
-            where: { id: childId as string, user: { id: (req as any).user!.id } }
+            where: { id: childId as string, userId: (req as any).user!.id } as any
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -151,7 +151,7 @@ app.get('/api/children', authenticateToken, async (req: AuthRequest, res) => {
     try {
         console.log(`Fetching children for user: ${(req as any).user!.id}`);
         const children = await prisma.child.findMany({
-            where: { user: { id: (req as any).user!.id } },
+            where: { userId: (req as any).user!.id } as any,
             include: {
                 rewardConfig: true
             },
@@ -180,8 +180,8 @@ app.post('/api/children', authenticateToken, async (req: AuthRequest, res) => {
                 rewardConfig: {
                     create: {}
                 }
-            },
-            include: { rewardConfig: true }
+            } as any,
+            include: { rewardConfig: true } as any
         });
 
         res.json(child);
@@ -272,7 +272,7 @@ app.post('/api/schedules/batch', authenticateToken, async (req: AuthRequest, res
 
     // Verify ownership
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: req.user!.id }
+        where: { id: childId, userId: (req as any).user!.id } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -345,7 +345,7 @@ app.delete('/api/schedules/all/:childId', authenticateToken, async (req: AuthReq
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id: childId, userId: (req as any).user!.id }
+            where: { id: childId, userId: (req as any).user!.id } as any
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -363,7 +363,7 @@ app.get('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
     if (!childId) return res.status(400).json([]);
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id }
+        where: { id: childId, userId: (req as any).user!.id } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -383,7 +383,7 @@ app.post('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
     const { childId, amount, reason } = req.body;
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: req.user!.id }
+        where: { id: childId, userId: (req as any).user!.id } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -399,7 +399,7 @@ app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => 
     const childId = req.body.childId as string | undefined;
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id }
+        where: { id: childId, userId: (req as any).user!.id } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -416,7 +416,7 @@ app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => 
 app.get('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
     const childId = req.params.childId as string;
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id }
+        where: { id: childId, userId: (req as any).user!.id } as any
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
