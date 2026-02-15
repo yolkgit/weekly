@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 
-import { INITIAL_SCHEDULE, DAYS, generateId, getRecommendedSchedule, getTimeRange, getCustomTimeRange, GRADE_DEFAULTS, FULL_TIME_RANGE, DEFAULT_REWARD_CONFIG } from './constants';
-import { TimeSlot, FontConfig, RewardMode, PointUsageLog, ChildProfile, GradeLevel, RewardConfig } from './types';
-import { ScheduleGrid } from './components/ScheduleGrid';
-import { MobileDayView } from './components/MobileDayView';
-import { StatsCard } from './components/StatsCard';
-import { EditSlotModal } from './components/EditSlotModal';
+import { INITIAL_SCHEDULE, DAYS, generateId, getRecommendedSchedule, getTimeRange, getCustomTimeRange, GRADE_DEFAULTS, FULL_TIME_RANGE, DEFAULT_REWARD_CONFIG } from '@/constants';
+import { TimeSlot, FontConfig, RewardMode, PointUsageLog, ChildProfile, GradeLevel, RewardConfig } from '@/types';
+import { ScheduleGrid } from '@/components/ScheduleGrid';
+import { MobileDayView } from '@/components/MobileDayView';
+import { StatsCard } from '@/components/StatsCard';
+import { EditSlotModal } from '@/components/EditSlotModal';
 
-import { FontSettingsModal } from './components/FontSettingsModal';
-import { GameTimeModal } from './components/GameTimeModal';
-import { ChildManagementModal } from './components/ChildManagementModal';
-import { HelpModal } from './components/HelpModal';
-import { SecurityKeypad } from './components/SecurityKeypad';
-import { getScheduleAdvice } from './services/geminiService';
+import { FontSettingsModal } from '@/components/FontSettingsModal';
+import { GameTimeModal } from '@/components/GameTimeModal';
+import { ChildManagementModal } from '@/components/ChildManagementModal';
+import { HelpModal } from '@/components/HelpModal';
+import { SecurityKeypad } from '@/components/SecurityKeypad';
+import { getScheduleAdvice } from '@/services/geminiService';
 import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen } from 'lucide-react';
 
-import { api } from './services/api';
+import { api } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { LogOut } from 'lucide-react';
 
