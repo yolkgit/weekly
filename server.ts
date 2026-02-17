@@ -187,7 +187,8 @@ app.post('/api/children', authenticateToken, async (req: AuthRequest, res) => {
 
         res.json(child);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to create child' });
+        console.error("Create child error:", error);
+        res.status(500).json({ error: 'Failed to create child', details: (error as any).message });
     }
 });
 
@@ -443,8 +444,8 @@ app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
     try {
         const config = await prisma.rewardConfig.upsert({
             where: { childId: childId },
-            update: { mode, unit, study, academy, school, routine, rest, sleep },
-            create: { childId, mode, unit, study, academy, school, routine, rest, sleep }
+            update: { mode, unit, study, academy, school, routine, rest, sleep } as any,
+            create: { childId, mode, unit, study, academy, school, routine, rest, sleep } as any
         });
         res.json(config);
     } catch (e) {
