@@ -201,5 +201,38 @@ export const api = {
         const data = await res.json();
         const { id, childId: _, ...savedConfig } = data;
         return savedConfig as RewardConfig;
+    },
+
+    // --- Admin & Config ---
+    getPublicConfig: async () => {
+        const res = await fetch(`${API_BASE}/public/config`);
+        if (!res.ok) throw new Error('Failed to fetch config');
+        return res.json();
+    },
+
+    updateAdminConfig: async (password: string, settings: Record<string, string>) => {
+        const res = await fetch(`${API_BASE}/admin/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password, settings })
+        });
+        if (!res.ok) throw new Error('Failed to update config');
+        return res.json();
+    },
+
+    // --- Premium ---
+    getUserInfo: async () => {
+        const res = await fetch(`${API_BASE}/user/me`, { headers: getHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch user info');
+        return res.json();
+    },
+
+    upgradePremium: async () => {
+        const res = await fetch(`${API_BASE}/user/premium`, {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        if (!res.ok) throw new Error('Failed to upgrade premium');
+        return res.json();
     }
 };

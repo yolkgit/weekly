@@ -1,10 +1,11 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 interface User {
     id: string;
     email: string;
     parentPassword?: string;
+    isPremium?: boolean;
 }
 
 interface AuthContextType {
@@ -12,6 +13,7 @@ interface AuthContextType {
     token: string | null;
     login: (token: string, user: User) => void;
     logout: () => void;
+    refreshUser: () => Promise<void>;
     isAuthenticated: boolean;
 }
 
@@ -22,7 +24,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
 
     useEffect(() => {
-        // Hydrate user from localStorage if token exists
         const storedUser = localStorage.getItem('user');
         if (token && storedUser) {
             setUser(JSON.parse(storedUser));
@@ -43,8 +44,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
     };
 
+    const refreshUser = async () => {
+        if (!token) return;
+        try {
+            const freshUser = await api.getUserInfo();
+            // Preserve parentPassword if it's not returned by getUserInfo (it shouldn't be usually, but login does return it)
+            // Actually getUserInfo returns basic info. Login returns parentPassword.
+            // We should merge with existing to keep parentPassword if needed, or api.getUserInfo should return it?
+            // Login returns parentPassword. getUserInfo (User endpoint) usually returns profile but maybe not sensitive info.
+            // Let's assume we want to keep parentPassword from local state if available.
+            const updatedUser = { ...user, ...freshUser };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+        } catch (e) {
+            console.error("Failed to refresh user", e);
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, refreshUser, isAuthenticated: !!token }}>
             {children}
         </AuthContext.Provider>
     );

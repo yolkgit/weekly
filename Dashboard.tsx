@@ -23,7 +23,10 @@ import { LogOut } from 'lucide-react';
 // Colors for children profiles
 const CHILD_COLORS = ['indigo', 'emerald', 'rose', 'amber', 'cyan', 'purple'];
 
-export const Dashboard: React.FC = () => {
+import { AdSidebar } from './components/AdSidebar';
+import { AdInterstitial } from './components/AdInterstitial';
+
+export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ appConfig = {} }) => {
     const { user, login, logout } = useAuth();
     // --- 1. Child Profile Management ---
 
@@ -120,6 +123,8 @@ export const Dashboard: React.FC = () => {
     const [editingSlot, setEditingSlot] = useState<TimeSlot | undefined>(undefined);
     const [selectedDayIdx, setSelectedDayIdx] = useState(0);
     const [selectedTime, setSelectedTime] = useState("");
+    const [isAdInterstitialOpen, setIsAdInterstitialOpen] = useState(false);
+    const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
     // Batch Selection State
     const [selectedRange, setSelectedRange] = useState<{ start: { day: number, time: string }, end: { day: number, time: string } } | null>(null);
@@ -633,6 +638,21 @@ export const Dashboard: React.FC = () => {
 
                     {/* Right: Controls */}
                     <div className="flex items-center gap-2 sm:gap-4">
+                        {!user?.isPremium && (
+                            <button
+                                onClick={async () => {
+                                    if (confirm("월 1,000원에 광고를 제거하시겠습니까? (모의 결제)")) {
+                                        await api.upgradePremium();
+                                        // Refresh user logic would be good here, forcing page reload for now if context not avail
+                                        alert("프리미엄 회원이 되었습니다! 광고가 제거됩니다.");
+                                        window.location.reload();
+                                    }
+                                }}
+                                className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
+                            >
+                                <Sparkles size={14} /> 프리미엄 (광고제거)
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={handlePrintClick}
@@ -743,6 +763,16 @@ export const Dashboard: React.FC = () => {
                                                         handleUpdateActiveChild({ ...activeChild, isPlanConfirmed: false });
                                                     }
                                                 } else {
+
+
+                                                    // Check if ads enabled and user not premium
+                                                    const adsEnabled = appConfig['ADS_ENABLED'] === 'true';
+                                                    if (adsEnabled && !user?.isPremium) {
+                                                        setPendingConfirmation(true);
+                                                        setIsAdInterstitialOpen(true);
+                                                        return;
+                                                    }
+
                                                     // Auto-save on confirm
                                                     const now = new Date();
                                                     const dateStr = now.toLocaleDateString();
@@ -1091,6 +1121,44 @@ export const Dashboard: React.FC = () => {
                 onConfirm={handleSecurityConfirm}
                 title={securityAction === 'auth' ? "부모님 모드 확인" : "비밀번호 설정"}
                 description={securityAction === 'auth' ? "비밀번호를 입력해주세요." : "새로운 비밀번호를 입력해주세요 (4-8자리)."}
+            />
+            <SecurityKeypad
+                isOpen={isSecurityModalOpen}
+                onClose={() => setIsSecurityModalOpen(false)}
+                onConfirm={handleSecurityConfirm}
+                title={securityAction === 'auth' ? "부모님 모드 확인" : "비밀번호 설정"}
+                description={securityAction === 'auth' ? "비밀번호를 입력해주세요." : "새로운 비밀번호를 입력해주세요 (4-8자리)."}
+            />
+
+            {/* Ads */}
+            <AdSidebar side="left" config={appConfig} isPremium={!!user?.isPremium} />
+            <AdSidebar side="right" config={appConfig} isPremium={!!user?.isPremium} />
+
+            <AdInterstitial
+                isOpen={isAdInterstitialOpen}
+                config={appConfig}
+                onClose={() => {
+                    setIsAdInterstitialOpen(false);
+                    if (pendingConfirmation) {
+                        // Proceed with confirmation
+                        const now = new Date();
+                        const dateStr = now.toLocaleDateString();
+                        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const name = `${dateStr} 계획 - ${timeStr}`;
+
+                        api.createSnapshot({
+                            childId: activeChildId,
+                            name,
+                            date: dateStr,
+                            schedule
+                        }).then(snap => {
+                            setSavedSchedules(prev => [snap, ...prev]);
+                        }).catch(e => console.error("Auto-save failed", e));
+
+                        handleUpdateActiveChild({ ...activeChild, isPlanConfirmed: true });
+                        setPendingConfirmation(false);
+                    }
+                }}
             />
         </div>
     );

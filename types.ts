@@ -61,3 +61,15 @@ export interface ChildProfile {
   endTime?: string;   // Custom end time e.g., "21:00"
   isPlanConfirmed?: boolean;
 }
+
+export interface AppConfig {
+  key: string;
+  value: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  isPremium: boolean;
+  premiumExpiry?: string; // ISO Date string
+}

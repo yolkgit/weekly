@@ -18,6 +18,8 @@ model User {
   children  Child[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  isPremium Boolean  @default(false)
+  premiumExpiry DateTime?
 }
 
 model Child {
@@ -83,4 +85,9 @@ model ScheduleSnapshot {
   date      String
   schedule  Json
   createdAt DateTime @default(now())
+}
+
+model AppConfig {
+  key   String @id
+  value String @db.Text // JSON string or text value
 }

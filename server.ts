@@ -452,6 +452,79 @@ app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
     }
 });
 
+// --- Admin & Global Config API ---
+
+// Public Config (for Frontend)
+app.get('/api/public/config', async (req, res) => {
+    try {
+        const configs = await (prisma as any).appConfig.findMany();
+        const configMap: Record<string, string> = {};
+        configs.forEach((c: any) => {
+            configMap[c.key] = c.value;
+        });
+        res.json(configMap);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch config' });
+    }
+});
+
+// Admin Update Config (Protected by simple password)
+app.post('/api/admin/config', async (req, res) => {
+    const { password, settings } = req.body;
+
+    // Simple hardcoded admin password for now
+    if (password !== 'admin1234') {
+        return res.status(401).json({ error: 'Invalid admin password' });
+    }
+
+    try {
+        const operations = Object.entries(settings).map(([key, value]) => {
+            return (prisma as any).appConfig.upsert({
+                where: { key },
+                update: { value: String(value) },
+                create: { key, value: String(value) }
+            });
+        });
+        await prisma.$transaction(operations);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to update config' });
+    }
+});
+
+// --- User Premium API ---
+
+app.get('/api/user/me', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+        const user = await (prisma as any).user.findUnique({
+            where: { id: (req as any).user!.id }
+        });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json({
+            id: user.id,
+            email: user.email,
+            isPremium: !!user.isPremium,
+            premiumExpiry: user.premiumExpiry
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch user info' });
+    }
+});
+
+app.post('/api/user/premium', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+        // Mock payment verification - instantly upgrade
+        await (prisma as any).user.update({
+            where: { id: (req as any).user!.id },
+            data: { isPremium: true, premiumExpiry: null } // Lifetime or managed externally
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to upgrade premium' });
+    }
+});
+
 // Serve Static Files in Production
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
