@@ -221,6 +221,11 @@ export const EditSlotModal: React.FC<EditSlotModalProps> = ({
                             type="text"
                             value={activity}
                             onChange={(e) => setActivity(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSave();
+                                }
+                            }}
                             placeholder="직접 입력하거나 위에서 선택하세요"
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-slate-800 font-medium"
                         />

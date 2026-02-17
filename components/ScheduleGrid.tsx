@@ -41,9 +41,9 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
   // Stop dragging if mouse leaves the window
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-        if (isDragging) {
-            finishDrag();
-        }
+      if (isDragging) {
+        finishDrag();
+      }
     };
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -65,13 +65,24 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
   const finishDrag = () => {
     setIsDragging(false);
     if (dragStart && dragCurrent) {
-        // If start and end are the same, treat as click (handled by onClick usually, but we can detect here)
-        if (dragStart.day === dragCurrent.day && dragStart.time === dragCurrent.time) {
-            // It's a click, handled by button onClick
+      // If start and end are the same, treat as click
+      if (dragStart.day === dragCurrent.day && dragStart.time === dragCurrent.time) {
+        const slot = schedule.find(s => s.dayIndex === dragStart.day && s.startTime === dragStart.time);
+        if (slot) {
+          // Existing slot: Clickable if not confirmed OR (confirmed AND parent mode)
+          if (!isPlanConfirmed || isParentMode) {
+            onSlotClick(dragStart.day, dragStart.time, slot);
+          }
         } else {
-            // It's a range select
-            onRangeSelect(dragStart, dragCurrent);
+          // Empty slot: Clickable only if not confirmed
+          if (!isPlanConfirmed) {
+            onSlotClick(dragStart.day, dragStart.time);
+          }
         }
+      } else {
+        // It's a range select
+        onRangeSelect(dragStart, dragCurrent);
+      }
     }
     setDragStart(null);
     setDragCurrent(null);
@@ -83,19 +94,19 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
 
     const minDay = Math.min(dragStart.day, dragCurrent.day);
     const maxDay = Math.max(dragStart.day, dragCurrent.day);
-    
+
     const timeIdx = timeRange.indexOf(time);
     const startTimeIdx = timeRange.indexOf(dragStart.time);
     const currentTimeIdx = timeRange.indexOf(dragCurrent.time);
-    
+
     const minTimeIdx = Math.min(startTimeIdx, currentTimeIdx);
     const maxTimeIdx = Math.max(startTimeIdx, currentTimeIdx);
 
     return (
-        dayIdx >= minDay && 
-        dayIdx <= maxDay && 
-        timeIdx >= minTimeIdx && 
-        timeIdx <= maxTimeIdx
+      dayIdx >= minDay &&
+      dayIdx <= maxDay &&
+      timeIdx >= minTimeIdx &&
+      timeIdx <= maxTimeIdx
     );
   };
 
@@ -119,9 +130,9 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
         <div className="grid grid-cols-8 gap-1 mb-1">
           <div className={`flex items-center justify-center font-bold text-slate-400 ${timeSize} h-10 bg-transparent`}>시간</div>
           {DAYS.map((day, idx) => (
-            <div 
-                key={day.shortName} 
-                className={`
+            <div
+              key={day.shortName}
+              className={`
                     flex items-center justify-center font-bold h-10 rounded-t-lg border-b-2 pdf-header-cell ${headerSize}
                     ${idx < 2 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-50 text-slate-700 border-slate-200'}
                 `}
@@ -143,21 +154,17 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
 
               // If slot exists
               if (slot) {
-                  const isClickable = !isPlanConfirmed || (isPlanConfirmed && isParentMode);
-                  return (
-                    <div
-                      key={slot.id}
-                      className="relative w-full h-full"
-                      onMouseDown={() => handleMouseDown(dayIdx, time)}
-                      onMouseEnter={() => handleMouseEnter(dayIdx, time)}
-                      onMouseUp={finishDrag}
-                    >
-                        <button
-                          onClick={(e) => {
-                             e.stopPropagation(); // Prevent drag finish from double triggering if click
-                             if (!isDragging && isClickable) onSlotClick(dayIdx, time, slot);
-                          }}
-                          className={`
+                const isClickable = !isPlanConfirmed || (isPlanConfirmed && isParentMode);
+                return (
+                  <div
+                    key={slot.id}
+                    className="relative w-full h-full"
+                    onMouseDown={() => handleMouseDown(dayIdx, time)}
+                    onMouseEnter={() => handleMouseEnter(dayIdx, time)}
+                    onMouseUp={finishDrag}
+                  >
+                    <button
+                      className={`
                             w-full h-full rounded-md border font-medium flex flex-col items-center justify-center p-0.5 text-center leading-tight transition-all
                             pdf-cell ${cellSize}
                             ${getActivityColor(slot.type)}
@@ -167,39 +174,35 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
                             ${slot.status === 'failed' ? 'opacity-50 grayscale' : ''}
                             print:border-slate-300 print:shadow-none print:opacity-100 print:ring-0
                           `}
-                        >
-                           {getStatusIcon(slot.status)}
-                           <span className="w-full truncate px-1 pdf-cell-text">{slot.activity}</span>
-                        </button>
-                    </div>
-                  );
+                    >
+                      {getStatusIcon(slot.status)}
+                      <span className="w-full truncate px-1 pdf-cell-text">{slot.activity}</span>
+                    </button>
+                  </div>
+                );
               }
 
               // Empty Slot
               return (
                 <div
-                    key={`${dayIdx}-${time}`} 
-                    className="relative w-full h-full"
-                    onMouseDown={() => handleMouseDown(dayIdx, time)}
-                    onMouseEnter={() => handleMouseEnter(dayIdx, time)}
-                    onMouseUp={finishDrag}
+                  key={`${dayIdx}-${time}`}
+                  className="relative w-full h-full"
+                  onMouseDown={() => handleMouseDown(dayIdx, time)}
+                  onMouseEnter={() => handleMouseEnter(dayIdx, time)}
+                  onMouseUp={finishDrag}
                 >
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isDragging && !isPlanConfirmed) onSlotClick(dayIdx, time);
-                        }}
-                        disabled={isPlanConfirmed}
-                        className={`
+                  <button
+                    disabled={isPlanConfirmed}
+                    className={`
                             w-full h-full rounded-md border border-dashed border-slate-200 bg-slate-50/30 transition-all flex items-center justify-center group
                             print:border-slate-100
                             ${!isPlanConfirmed ? 'hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer' : 'cursor-default'}
                             ${isSelected ? 'bg-indigo-100/80 border-indigo-400 ring-2 ring-indigo-400 z-10' : ''}
                             pdf-cell
                         `}
-                    >
-                        {!isPlanConfirmed && !isSelected && <Plus size={16} className="text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                    </button>
+                  >
+                    {!isPlanConfirmed && !isSelected && <Plus size={16} className="text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                  </button>
                 </div>
               );
             })}
