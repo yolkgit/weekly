@@ -19,6 +19,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isPremium Boolean  @default(false)
+  premiumStatus String @default("NONE") // NONE, PENDING, APPROVED
+  depositorName String?
   premiumExpiry DateTime?
 }
 
@@ -89,5 +91,5 @@ model ScheduleSnapshot {
 
 model AppConfig {
   key   String @id
-  value String @db.Text // JSON string or text value
+  value String @db.LongText // JSON string or text value (LongText for Base64 images)
 }

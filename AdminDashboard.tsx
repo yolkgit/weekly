@@ -10,12 +10,21 @@ export const AdminDashboard: React.FC = () => {
     const [adsEnabled, setAdsEnabled] = useState(false);
     const [adsenseId, setAdsenseId] = useState('');
     const [coupangHtml, setCoupangHtml] = useState('');
+    const [kakaoQrCode, setKakaoQrCode] = useState(''); // Base64
     const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        // Load public config initially to see current state
-        loadConfig();
-    }, []);
+    // Pending Deposits
+    const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
+
+    const loadPendingDeposits = async () => {
+        try {
+            const res = await fetch('/api/admin/pending-deposits');
+            const data = await res.json();
+            if (Array.isArray(data)) setPendingDeposits(data);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const loadConfig = async () => {
         try {
@@ -23,8 +32,34 @@ export const AdminDashboard: React.FC = () => {
             setAdsEnabled(config['ADS_ENABLED'] === 'true');
             setAdsenseId(config['ADSENSE_SLOT_ID'] || '');
             setCoupangHtml(config['COUPANG_BANNER_HTML'] || '');
+            setKakaoQrCode(config['KAKAO_PAY_QR'] || '');
         } catch (e) {
             console.error("Failed to load config", e);
+        }
+    };
+
+    useEffect(() => {
+        // Load public config initially to see current state
+        loadConfig();
+        if (isAuthenticated) loadPendingDeposits();
+    }, [isAuthenticated]);
+
+    const approveDeposit = async (userId: string) => {
+        if (!confirm("입금을 확인하고 승인하시겠습니까?")) return;
+        try {
+            const res = await fetch('/api/admin/approve-deposit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, password })
+            });
+            if (res.ok) {
+                alert("승인되었습니다.");
+                loadPendingDeposits();
+            } else {
+                alert("실패했습니다.");
+            }
+        } catch (e) {
+            alert("오류가 발생했습니다.");
         }
     };
 
@@ -43,7 +78,8 @@ export const AdminDashboard: React.FC = () => {
             await api.updateAdminConfig(password, {
                 ADS_ENABLED: String(adsEnabled),
                 ADSENSE_SLOT_ID: adsenseId,
-                COUPANG_BANNER_HTML: coupangHtml
+                COUPANG_BANNER_HTML: coupangHtml,
+                KAKAO_PAY_QR: kakaoQrCode
             });
             alert("설정이 저장되었습니다.");
         } catch (e) {
@@ -97,6 +133,37 @@ export const AdminDashboard: React.FC = () => {
 
             <main className="max-w-4xl mx-auto p-6 space-y-6">
 
+                {/* Deposit Requests */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center gap-2">
+                        <Monitor size={20} className="text-indigo-600" />
+                        <h2 className="font-bold text-indigo-900">입금 확인 요청 ({pendingDeposits.length})</h2>
+                    </div>
+                    <div className="p-0">
+                        {pendingDeposits.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 text-sm">대기 중인 요청이 없습니다.</div>
+                        ) : (
+                            <div className="divide-y divide-slate-100">
+                                {pendingDeposits.map(user => (
+                                    <div key={user.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                        <div>
+                                            <div className="font-bold text-slate-800">{user.name} <span className="text-slate-400 font-normal text-xs">({user.email})</span></div>
+                                            <div className="text-sm text-indigo-600 font-bold mt-0.5">입금자명: {user.depositorName || '(미입력)'}</div>
+                                            <div className="text-xs text-slate-500">{new Date(user.createdAt).toLocaleDateString()} 가입</div>
+                                        </div>
+                                        <button
+                                            onClick={() => approveDeposit(user.id)}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
+                                        >
+                                            승인하기
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Status Card */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between">
                     <div>
@@ -149,6 +216,37 @@ export const AdminDashboard: React.FC = () => {
                             />
                             <p className="text-xs text-slate-400 mt-1">쿠팡 파트너스에서 생성한 iframe 코드를 붙여넣으세요.</p>
                         </div>
+                        {/* KakaoPay QR */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">카카오페이 QR 송금 코드</label>
+
+                            <div className="flex items-start gap-4">
+                                <div className="flex-1">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setKakaoQrCode(reader.result as string);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1">카카오페이 송금 받기 QR코드 이미지를 업로드하세요. (이미지는 자동으로 변환되어 저장됩니다)</p>
+                                </div>
+                                {kakaoQrCode && (
+                                    <div className="w-24 h-24 border border-slate-200 rounded-lg overflow-hidden bg-white shrink-0">
+                                        <img src={kakaoQrCode} alt="Kakao QR" className="w-full h-full object-contain" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                     </div>
 
                     <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end">

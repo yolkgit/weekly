@@ -488,27 +488,55 @@ app.get('/api/public/config', async (req, res) => {
     }
 });
 
-// Admin Update Config (Protected by simple password)
+// --- Admin API ---
 app.post('/api/admin/config', async (req, res) => {
-    const { password, settings } = req.body;
-
-    // Simple hardcoded admin password for now
+    const { password } = req.body;
     if (password !== 'admin1234') {
-        return res.status(401).json({ error: 'Invalid admin password' });
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR } = req.body;
+
+    try {
+        if (ADS_ENABLED !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADS_ENABLED' }, update: { value: ADS_ENABLED }, create: { key: 'ADS_ENABLED', value: ADS_ENABLED } });
+        if (ADSENSE_SLOT_ID !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADSENSE_SLOT_ID' }, update: { value: ADSENSE_SLOT_ID }, create: { key: 'ADSENSE_SLOT_ID', value: ADSENSE_SLOT_ID } });
+        if (COUPANG_BANNER_HTML !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'COUPANG_BANNER_HTML' }, update: { value: COUPANG_BANNER_HTML }, create: { key: 'COUPANG_BANNER_HTML', value: COUPANG_BANNER_HTML } });
+        if (KAKAO_PAY_QR !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'KAKAO_PAY_QR' }, update: { value: KAKAO_PAY_QR }, create: { key: 'KAKAO_PAY_QR', value: KAKAO_PAY_QR } });
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed' });
+    }
+});
+
+app.get('/api/admin/pending-deposits', async (req, res) => {
+    try {
+        const users = await (prisma as any).user.findMany({
+            where: { premiumStatus: 'PENDING' },
+            select: { id: true, email: true, name: true, premiumStatus: true, depositorName: true, createdAt: true }
+        });
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch pending deposits' });
+    }
+});
+
+app.post('/api/admin/approve-deposit', async (req, res) => {
+    const { userId, password } = req.body;
+    if (password !== 'admin1234') {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
     try {
-        const operations = Object.entries(settings).map(([key, value]) => {
-            return (prisma as any).appConfig.upsert({
-                where: { key },
-                update: { value: String(value) },
-                create: { key, value: String(value) }
-            });
+        await (prisma as any).user.update({
+            where: { id: userId },
+            data: {
+                isPremium: true,
+                premiumStatus: 'APPROVED'
+            }
         });
-        await prisma.$transaction(operations);
         res.json({ success: true });
     } catch (e) {
-        res.status(500).json({ error: 'Failed to update config' });
+        res.status(500).json({ error: 'Failed to approve' });
     }
 });
 
@@ -525,6 +553,7 @@ app.get('/api/user/me', authenticateToken, async (req: AuthRequest, res) => {
             id: user.id,
             email: user.email,
             isPremium: !!user.isPremium,
+            premiumStatus: (user as any).premiumStatus || 'NONE',
             premiumExpiry: user.premiumExpiry
         });
     } catch (e) {
@@ -532,16 +561,21 @@ app.get('/api/user/me', authenticateToken, async (req: AuthRequest, res) => {
     }
 });
 
-app.post('/api/user/premium', authenticateToken, async (req: AuthRequest, res) => {
+app.post('/api/user/premium', authenticateToken, async (req, res) => {
     try {
-        // Mock payment verification - instantly upgrade
+        const { depositorName } = req.body;
+        // Request Premium (Set to PENDING)
         await (prisma as any).user.update({
-            where: { id: (req as any).user!.id },
-            data: { isPremium: true, premiumExpiry: null } // Lifetime or managed externally
+            where: { id: (req as any).user.userId },
+            data: {
+                premiumStatus: 'PENDING',
+                depositorName: depositorName
+                // Do NOT set isPremium: true yet
+            }
         });
-        res.json({ success: true });
+        res.json({ success: true, status: 'PENDING' });
     } catch (e) {
-        res.status(500).json({ error: 'Failed to upgrade premium' });
+        res.status(500).json({ error: 'Failed to request premium' });
     }
 });
 

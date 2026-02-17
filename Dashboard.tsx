@@ -14,7 +14,7 @@ import { ChildManagementModal } from './components/ChildManagementModal';
 import { HelpModal } from './components/HelpModal';
 import { SecurityKeypad } from './components/SecurityKeypad';
 import { getScheduleAdvice } from './services/geminiService';
-import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen } from 'lucide-react';
+import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen, XCircle, CheckCircle } from 'lucide-react';
 
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
@@ -129,6 +129,9 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
     // Batch Selection State
     const [selectedRange, setSelectedRange] = useState<{ start: { day: number, time: string }, end: { day: number, time: string } } | null>(null);
     const [isClearing, setIsClearing] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [depositorName, setDepositorName] = useState('');
+    const [paymentStep, setPaymentStep] = useState<'qr' | 'confirm'>('qr'); // qr: show QR, confirm: input name
 
 
 
@@ -639,19 +642,25 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                     {/* Right: Controls */}
                     <div className="flex items-center gap-2 sm:gap-4">
                         {!user?.isPremium && (
-                            <button
-                                onClick={async () => {
-                                    if (confirm("월 1,000원에 광고를 제거하시겠습니까? (모의 결제)")) {
-                                        await api.upgradePremium();
-                                        // Refresh user logic would be good here, forcing page reload for now if context not avail
-                                        alert("프리미엄 회원이 되었습니다! 광고가 제거됩니다.");
-                                        window.location.reload();
-                                    }
-                                }}
-                                className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
-                            >
-                                <Sparkles size={14} /> 프리미엄 (광고제거)
-                            </button>
+                            user?.premiumStatus === 'PENDING' ? (
+                                <button
+                                    disabled
+                                    className="hidden sm:flex items-center gap-1 bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full text-xs font-bold cursor-not-allowed"
+                                >
+                                    <Clock size={14} /> 입금 확인 중
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={async () => {
+                                        if (confirm("월 1,000원에 광고를 제거하시겠습니까?")) {
+                                            setIsPaymentModalOpen(true);
+                                        }
+                                    }}
+                                    className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
+                                >
+                                    <Sparkles size={14} /> 프리미엄 (광고제거)
+                                </button>
+                            )
                         )}
                         <button
                             type="button"
@@ -1134,6 +1143,122 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             <AdSidebar side="left" config={appConfig} isPremium={!!user?.isPremium} />
             <AdSidebar side="right" config={appConfig} isPremium={!!user?.isPremium} />
 
+            {/* Payment Modal */}
+            {isPaymentModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-6 text-center text-white relative">
+                            <button
+                                onClick={() => setIsPaymentModalOpen(false)}
+                                className="absolute top-4 right-4 text-white/80 hover:text-white"
+                            >
+                                <XCircle size={24} />
+                            </button>
+                            <Sparkles className="mx-auto mb-2 text-yellow-100" size={32} />
+                            <h2 className="text-2xl font-black">프리미엄 멤버십</h2>
+                            <p className="text-yellow-100 font-medium">광고 없는 쾌적한 환경을 경험하세요!</p>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div className="text-center space-y-2">
+                                <p className="text-slate-600 text-sm">아래 QR코드를 스캔하여 입금해 주세요.</p>
+                                <div className="text-3xl font-bold text-indigo-900">1,000원 <span className="text-sm font-normal text-slate-500">/ 월</span></div>
+                            </div>
+
+                            {appConfig['KAKAO_PAY_QR'] ? (
+                                <div className="flex justify-center">
+                                    <div className="p-2 border-2 border-yellow-400 rounded-xl bg-white shadow-sm">
+                                        <img
+                                            src={appConfig['KAKAO_PAY_QR']}
+                                            alt="KakaoPay QR"
+                                            className="w-48 h-48 object-contain"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-slate-100 rounded-xl p-8 text-center text-slate-400">
+                                    <AlertCircle className="mx-auto mb-2" />
+                                    <p>관리자가 결제 코드를 설정하지 않았습니다.</p>
+                                </div>
+                            )}
+
+                            <div className="bg-slate-50 rounded-lg p-4 text-xs text-slate-500 space-y-1">
+                                <p className="font-bold text-slate-700">📌 입금 안내</p>
+                                <p>1. 카카오페이 앱으로 위 QR코드를 스캔하세요.</p>
+                                <p>2. <strong>1,000원</strong>을 송금해 주세요.</p>
+                                <p>3. 송금 후 아래 <strong>'입금 완료'</strong> 버튼을 눌러주세요.</p>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-3">
+                            {paymentStep === 'qr' ? (
+                                <button
+                                    onClick={() => setPaymentStep('confirm')}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle size={20} />
+                                    입금했습니다 (다음)
+                                </button>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">입금자명 (확인용)</label>
+                                        <input
+                                            type="text"
+                                            value={depositorName}
+                                            onChange={(e) => setDepositorName(e.target.value)}
+                                            placeholder="예: 홍길동"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">실제 입금하신 분의 성함을 입력해주세요.</p>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            if (!depositorName.trim()) {
+                                                alert("입금자명을 입력해주세요.");
+                                                return;
+                                            }
+                                            if (confirm(`'${depositorName}' 이름으로 입금하셨습니까? (관리자 확인 후 적용됩니다)`)) {
+                                                try {
+                                                    await api.upgradePremium(depositorName);
+                                                    alert("입금 확인 요청이 접수되었습니다! 관리자 확인 후 광고가 제거됩니다.");
+                                                    window.location.reload();
+                                                } catch (e) {
+                                                    alert("오류가 발생했습니다.");
+                                                }
+                                            }
+                                        }}
+                                        className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3.5 rounded-xl shadow-lg shadow-yellow-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle size={20} />
+                                        입금 완료 신청하기
+                                    </button>
+                                    <button
+                                        onClick={() => setPaymentStep('qr')}
+                                        className="w-full text-slate-500 hover:text-slate-800 text-sm py-2"
+                                    >
+                                        이전으로
+                                    </button>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setIsPaymentModalOpen(false);
+                                    setPaymentStep('qr');
+                                    setDepositorName('');
+                                }}
+                                className="w-full bg-white border border-slate-200 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-slate-50 transition-colors"
+                            >
+                                취소 / 닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Existing Modals */}
             <AdInterstitial
                 isOpen={isAdInterstitialOpen}
                 config={appConfig}

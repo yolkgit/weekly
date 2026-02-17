@@ -227,10 +227,11 @@ export const api = {
         return res.json();
     },
 
-    upgradePremium: async () => {
+    upgradePremium: async (depositorName?: string) => {
         const res = await fetch(`${API_BASE}/user/premium`, {
             method: 'POST',
-            headers: getHeaders()
+            headers: getHeaders(),
+            body: JSON.stringify({ depositorName })
         });
         if (!res.ok) throw new Error('Failed to upgrade premium');
         return res.json();
