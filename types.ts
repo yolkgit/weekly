@@ -32,7 +32,16 @@ export interface FontConfig {
 
 export type RewardMode = 'time' | 'currency';
 
-export type RewardConfig = Record<ActivityType, number>;
+export interface RewardConfig {
+  mode: RewardMode;
+  unit: string;
+  study: number;
+  academy: number;
+  school: number;
+  routine: number;
+  rest: number;
+  sleep: number;
+}
 
 export interface PointUsageLog {
   id: string;

@@ -7,7 +7,8 @@ import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { authenticateToken, AuthRequest } from './authMiddleware';
+import { authenticateToken } from './authMiddleware.ts';
+import type { AuthRequest } from './authMiddleware.ts';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -420,12 +421,30 @@ app.get('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
-    const data = req.body;
+    try {
+        const config = await prisma.rewardConfig.findUnique({
+            where: { childId: childId }
+        });
+        res.json(config || {});
+    } catch (e) {
+        res.status(500).json({ error: 'Failed fetch config' });
+    }
+});
+
+app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
+    const childId = req.params.childId as string;
+    const child = await prisma.child.findFirst({
+        where: { id: childId, userId: (req as any).user!.id } as any
+    });
+    if (!child) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { mode, unit, study, academy, school, routine, rest, sleep } = req.body;
+
     try {
         const config = await prisma.rewardConfig.upsert({
             where: { childId: childId },
-            update: { ...data },
-            create: { childId: childId, ...data }
+            update: { mode, unit, study, academy, school, routine, rest, sleep },
+            create: { childId, mode, unit, study, academy, school, routine, rest, sleep }
         });
         res.json(config);
     } catch (e) {

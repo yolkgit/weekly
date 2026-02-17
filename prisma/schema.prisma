@@ -65,6 +65,8 @@ model RewardConfig {
   id      String @id @default(uuid())
   childId String @unique
   child   Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  mode    String @default("time")
+  unit    String @default("Point")
   study   Int    @default(10)
   academy Int    @default(20)
   school  Int    @default(30)

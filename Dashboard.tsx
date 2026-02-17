@@ -88,9 +88,9 @@ export const Dashboard: React.FC = () => {
     const [usageLogs, setUsageLogs] = useState<PointUsageLog[]>([]);
 
     // Configs
-    const [rewardMode, setRewardMode] = useState<RewardMode>('time');
-    const [currencyUnit, setCurrencyUnit] = useState('포인트');
     const [rewardConfig, setRewardConfig] = useState<RewardConfig>(DEFAULT_REWARD_CONFIG);
+    const rewardMode = rewardConfig.mode;
+    const currencyUnit = rewardConfig.unit;
     const isPlanConfirmed = !!activeChild?.isPlanConfirmed;
 
     // Global UI State
@@ -279,6 +279,16 @@ export const Dashboard: React.FC = () => {
         } catch (e) {
             console.error("Failed to delete child:", e);
             alert("삭제 실패");
+        }
+    };
+
+    const handleRewardConfigUpdate = async (newConfig: RewardConfig) => {
+        setRewardConfig(newConfig);
+        try {
+            await api.saveRewardConfig(activeChildId, newConfig);
+        } catch (e) {
+            console.error("Failed to save reward config:", e);
+            // Optionally revert state here if critical, but for now just log
         }
     };
 
@@ -1049,12 +1059,8 @@ export const Dashboard: React.FC = () => {
                 usedPoints={usedPoints}
                 onUsePoints={handleUsePoints}
                 onResetUsed={handleResetUsedPoints}
-                rewardMode={rewardMode}
-                onRewardModeChange={setRewardMode}
-                currencyUnit={currencyUnit}
-                onCurrencyUnitChange={setCurrencyUnit}
                 rewardConfig={rewardConfig}
-                onRewardConfigChange={setRewardConfig}
+                onRewardConfigChange={handleRewardConfigUpdate}
                 usageLogs={usageLogs}
                 isParentMode={isParentMode}
             />
