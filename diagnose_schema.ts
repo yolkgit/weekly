@@ -16,7 +16,7 @@ async function main() {
 
         console.log("3. Checking AppConfig table...");
         try {
-            const appConfigs = await prisma.appConfig.findMany();
+            const appConfigs = await (prisma as any).appConfig.findMany();
             console.log("AppConfig count:", appConfigs.length);
         } catch (e) {
             console.error("AppConfig table error:", (e as any).message);
