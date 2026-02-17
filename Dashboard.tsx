@@ -14,7 +14,7 @@ import { ChildManagementModal } from './components/ChildManagementModal';
 import { HelpModal } from './components/HelpModal';
 import { SecurityKeypad } from './components/SecurityKeypad';
 import { getScheduleAdvice } from './services/geminiService';
-import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen, XCircle, CheckCircle } from 'lucide-react';
+import { Trophy, Clock, BrainCircuit, UserCog, User, Gamepad2, AlertCircle, AlertTriangle, Lock, Unlock, Printer, PenLine, Settings, Coins, Plus, Users, Smile, LayoutTemplate, Trash2, Baby, School, GraduationCap, Eraser, Sparkles, ChevronDown, BookOpen, XCircle, CheckCircle, Heart } from 'lucide-react';
 
 import { api } from './services/api';
 import { useAuth } from './context/AuthContext';
@@ -27,7 +27,7 @@ import { AdSidebar } from './components/AdSidebar';
 import { AdInterstitial } from './components/AdInterstitial';
 
 export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ appConfig = {} }) => {
-    const { user, login, logout } = useAuth();
+    const { user, login, logout, refreshUser } = useAuth();
     // --- 1. Child Profile Management ---
 
     // Initialize Children List
@@ -39,6 +39,9 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
     useEffect(() => {
         const init = async () => {
             try {
+                // Refresh user info to get latest premium status
+                await refreshUser();
+
                 let fetchedChildren = await api.getChildren();
                 if (fetchedChildren.length === 0) {
                     // Create default child if none exist
@@ -125,6 +128,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
     const [selectedTime, setSelectedTime] = useState("");
     const [isAdInterstitialOpen, setIsAdInterstitialOpen] = useState(false);
     const [pendingConfirmation, setPendingConfirmation] = useState(false);
+    const [pendingPrint, setPendingPrint] = useState(false);
 
     // Batch Selection State
     const [selectedRange, setSelectedRange] = useState<{ start: { day: number, time: string }, end: { day: number, time: string } } | null>(null);
@@ -566,8 +570,15 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
     };
 
     const handlePrintClick = () => {
-        // Simple window.print() relies on @media print CSS
-        // We can add a small delay if needed for re-renders but usually direct call is fine
+        // Check if ads enabled and user not premium
+        const adsEnabled = appConfig['ADS_ENABLED'] === 'true';
+        if (adsEnabled && !user?.isPremium) {
+            setPendingPrint(true);
+            setIsAdInterstitialOpen(true);
+            return;
+        }
+
+        // Direct print for premium or if ads are off
         window.print();
     };
 
@@ -647,18 +658,18 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                                     disabled
                                     className="hidden sm:flex items-center gap-1 bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full text-xs font-bold cursor-not-allowed"
                                 >
-                                    <Clock size={14} /> 입금 확인 중
+                                    <Clock size={14} /> 후원 확인 중
                                 </button>
                             ) : (
                                 <button
                                     onClick={async () => {
-                                        if (confirm("월 1,000원에 광고를 제거하시겠습니까?")) {
+                                        if (confirm("개발자를 후원하고 광고를 제거하시겠습니까?")) {
                                             setIsPaymentModalOpen(true);
                                         }
                                     }}
-                                    className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
+                                    className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-pink-300 to-rose-400 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
                                 >
-                                    <Sparkles size={14} /> 프리미엄 (광고제거)
+                                    <Heart size={14} fill="white" /> 개발자 후원 (광고제거)
                                 </button>
                             )
                         )}
@@ -1131,13 +1142,6 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                 title={securityAction === 'auth' ? "부모님 모드 확인" : "비밀번호 설정"}
                 description={securityAction === 'auth' ? "비밀번호를 입력해주세요." : "새로운 비밀번호를 입력해주세요 (4-8자리)."}
             />
-            <SecurityKeypad
-                isOpen={isSecurityModalOpen}
-                onClose={() => setIsSecurityModalOpen(false)}
-                onConfirm={handleSecurityConfirm}
-                title={securityAction === 'auth' ? "부모님 모드 확인" : "비밀번호 설정"}
-                description={securityAction === 'auth' ? "비밀번호를 입력해주세요." : "새로운 비밀번호를 입력해주세요 (4-8자리)."}
-            />
 
             {/* Ads */}
             <AdSidebar side="left" config={appConfig} isPremium={!!user?.isPremium} />
@@ -1147,22 +1151,22 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             {isPaymentModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-6 text-center text-white relative">
+                        <div className="bg-gradient-to-r from-pink-400 to-rose-500 p-6 text-center text-white relative">
                             <button
                                 onClick={() => setIsPaymentModalOpen(false)}
                                 className="absolute top-4 right-4 text-white/80 hover:text-white"
                             >
                                 <XCircle size={24} />
                             </button>
-                            <Sparkles className="mx-auto mb-2 text-yellow-100" size={32} />
-                            <h2 className="text-2xl font-black">프리미엄 멤버십</h2>
-                            <p className="text-yellow-100 font-medium">광고 없는 쾌적한 환경을 경험하세요!</p>
+                            <Heart className="mx-auto mb-2 text-pink-100 animate-bounce" size={32} fill="#ffe4e6" />
+                            <h2 className="text-2xl font-black">따뜻한 후원하기</h2>
+                            <p className="text-pink-100 font-medium">후원해주시면 평생 광고가 제거됩니다!</p>
                         </div>
 
                         <div className="p-6 space-y-6">
                             <div className="text-center space-y-2">
-                                <p className="text-slate-600 text-sm">아래 QR코드를 스캔하여 입금해 주세요.</p>
-                                <div className="text-3xl font-bold text-indigo-900">1,000원 <span className="text-sm font-normal text-slate-500">/ 월</span></div>
+                                <p className="text-slate-600 text-sm">아래 QR코드를 스캔하여 후원해 주세요.</p>
+                                <div className="text-3xl font-bold text-slate-800">1,000원 <span className="text-sm font-normal text-slate-500">(1회 결제)</span></div>
                             </div>
 
                             {appConfig['KAKAO_PAY_QR'] ? (
@@ -1262,10 +1266,13 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             <AdInterstitial
                 isOpen={isAdInterstitialOpen}
                 config={appConfig}
+                isPremium={!!user?.isPremium}
                 onClose={() => {
                     setIsAdInterstitialOpen(false);
+
+                    // Case 1: From Plan Confirmation
                     if (pendingConfirmation) {
-                        // Proceed with confirmation
+                        // Auto-save on confirm
                         const now = new Date();
                         const dateStr = now.toLocaleDateString();
                         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -1282,6 +1289,15 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
 
                         handleUpdateActiveChild({ ...activeChild, isPlanConfirmed: true });
                         setPendingConfirmation(false);
+                    }
+
+                    // Case 2: From Print Click
+                    if (pendingPrint) {
+                        // Small timeout to ensure modal is closed and backdrop cleared before print dialog
+                        setTimeout(() => {
+                            window.print();
+                            setPendingPrint(false);
+                        }, 100);
                     }
                 }}
             />

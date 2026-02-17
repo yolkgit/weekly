@@ -214,7 +214,7 @@ export const api = {
         const res = await fetch(`${API_BASE}/admin/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password, settings })
+            body: JSON.stringify({ password, ...settings })
         });
         if (!res.ok) throw new Error('Failed to update config');
         return res.json();

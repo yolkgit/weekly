@@ -1,15 +1,11 @@
-import { GoogleGenAI } from "@google/genai";
 import { TimeSlot } from '../types';
 import { DAYS } from '../constants';
 
+const API_BASE = window.location.origin.includes('localhost:3000')
+  ? 'http://localhost:4000/api'
+  : '/api';
+
 export const getScheduleAdvice = async (schedule: TimeSlot[]): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.warn("No API Key found");
-    return "API Key가 설정되지 않았습니다. .env 파일을 확인해주세요.";
-  }
-
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   // Summarize the schedule for the AI
   const summary = schedule.map(s =>
     `${DAYS[s.dayIndex].name} ${s.startTime}: ${s.activity} (${s.type})`
@@ -32,15 +28,22 @@ export const getScheduleAdvice = async (schedule: TimeSlot[]): Promise<string> =
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        thinkingConfig: { thinkingBudget: 0 }
-      }
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/ai/advice`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ prompt })
     });
 
-    return response.text || "분석 결과를 가져올 수 없습니다.";
+    if (!response.ok) {
+      throw new Error('Failed to fetch advice from server');
+    }
+
+    const data = await response.json();
+    return data.advice || "분석 결과를 가져올 수 없습니다.";
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";

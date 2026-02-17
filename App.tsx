@@ -18,7 +18,7 @@ const MainContent: React.FC = () => {
         api.getPublicConfig().then(setAppConfig).catch(console.error);
 
         return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    }, [path]);
 
     // Simple routing
     if (path === '/admin') {

@@ -10,9 +10,11 @@ import jwt from 'jsonwebtoken';
 import { authenticateToken } from './authMiddleware.ts';
 import type { AuthRequest } from './authMiddleware.ts';
 
+import { GoogleGenAI } from "@google/genai";
+
 const prisma = new PrismaClient();
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-this';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -494,13 +496,22 @@ app.post('/api/admin/config', async (req, res) => {
     if (password !== 'admin1234') {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-    const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR } = req.body;
+    const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR, AD_SIDEBAR_WIDTH, AD_SIDEBAR_HEIGHT, AD_SIDEBAR_MARGIN, AD_SIDEBAR_TOP, ADSENSE_INTERSTITIAL_ID, COUPANG_INTERSTITIAL_HTML, AD_INTERSTITIAL_TIMER, AD_INTERSTITIAL_WIDTH, AD_INTERSTITIAL_HEIGHT } = req.body;
 
     try {
         if (ADS_ENABLED !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADS_ENABLED' }, update: { value: ADS_ENABLED }, create: { key: 'ADS_ENABLED', value: ADS_ENABLED } });
         if (ADSENSE_SLOT_ID !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADSENSE_SLOT_ID' }, update: { value: ADSENSE_SLOT_ID }, create: { key: 'ADSENSE_SLOT_ID', value: ADSENSE_SLOT_ID } });
         if (COUPANG_BANNER_HTML !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'COUPANG_BANNER_HTML' }, update: { value: COUPANG_BANNER_HTML }, create: { key: 'COUPANG_BANNER_HTML', value: COUPANG_BANNER_HTML } });
         if (KAKAO_PAY_QR !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'KAKAO_PAY_QR' }, update: { value: KAKAO_PAY_QR }, create: { key: 'KAKAO_PAY_QR', value: KAKAO_PAY_QR } });
+        if (AD_SIDEBAR_WIDTH !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_WIDTH' }, update: { value: AD_SIDEBAR_WIDTH }, create: { key: 'AD_SIDEBAR_WIDTH', value: AD_SIDEBAR_WIDTH } });
+        if (AD_SIDEBAR_HEIGHT !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_HEIGHT' }, update: { value: AD_SIDEBAR_HEIGHT }, create: { key: 'AD_SIDEBAR_HEIGHT', value: AD_SIDEBAR_HEIGHT } });
+        if (AD_SIDEBAR_MARGIN !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_MARGIN' }, update: { value: AD_SIDEBAR_MARGIN }, create: { key: 'AD_SIDEBAR_MARGIN', value: AD_SIDEBAR_MARGIN } });
+        if (AD_SIDEBAR_TOP !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_TOP' }, update: { value: AD_SIDEBAR_TOP }, create: { key: 'AD_SIDEBAR_TOP', value: AD_SIDEBAR_TOP } });
+        if (ADSENSE_INTERSTITIAL_ID !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADSENSE_INTERSTITIAL_ID' }, update: { value: ADSENSE_INTERSTITIAL_ID }, create: { key: 'ADSENSE_INTERSTITIAL_ID', value: ADSENSE_INTERSTITIAL_ID } });
+        if (COUPANG_INTERSTITIAL_HTML !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'COUPANG_INTERSTITIAL_HTML' }, update: { value: COUPANG_INTERSTITIAL_HTML }, create: { key: 'COUPANG_INTERSTITIAL_HTML', value: COUPANG_INTERSTITIAL_HTML } });
+        if (AD_INTERSTITIAL_TIMER !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_TIMER' }, update: { value: AD_INTERSTITIAL_TIMER }, create: { key: 'AD_INTERSTITIAL_TIMER', value: AD_INTERSTITIAL_TIMER } });
+        if (AD_INTERSTITIAL_WIDTH !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_WIDTH' }, update: { value: AD_INTERSTITIAL_WIDTH }, create: { key: 'AD_INTERSTITIAL_WIDTH', value: AD_INTERSTITIAL_WIDTH } });
+        if (AD_INTERSTITIAL_HEIGHT !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_HEIGHT' }, update: { value: AD_INTERSTITIAL_HEIGHT }, create: { key: 'AD_INTERSTITIAL_HEIGHT', value: AD_INTERSTITIAL_HEIGHT } });
 
         res.json({ success: true });
     } catch (e) {
@@ -512,10 +523,11 @@ app.get('/api/admin/pending-deposits', async (req, res) => {
     try {
         const users = await (prisma as any).user.findMany({
             where: { premiumStatus: 'PENDING' },
-            select: { id: true, email: true, name: true, premiumStatus: true, depositorName: true, createdAt: true }
+            select: { id: true, email: true, premiumStatus: true, depositorName: true, createdAt: true }
         });
         res.json(users);
-    } catch (e) {
+    } catch (e: any) {
+        console.error("Error fetching pending deposits:", e);
         res.status(500).json({ error: 'Failed to fetch pending deposits' });
     }
 });
@@ -537,6 +549,39 @@ app.post('/api/admin/approve-deposit', async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to approve' });
+    }
+});
+
+app.get('/api/admin/approved-donations', async (req, res) => {
+    try {
+        const users = await (prisma as any).user.findMany({
+            where: { premiumStatus: 'APPROVED' },
+            select: { id: true, email: true, premiumStatus: true, depositorName: true, createdAt: true }
+        });
+        res.json(users);
+    } catch (e: any) {
+        console.error("Error fetching approved donations:", e);
+        res.status(500).json({ error: 'Failed to fetch approved donations' });
+    }
+});
+
+app.post('/api/admin/revoke-donation', async (req, res) => {
+    const { userId, password } = req.body;
+    if (password !== 'admin1234') {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        await (prisma as any).user.update({
+            where: { id: userId },
+            data: {
+                isPremium: false,
+                premiumStatus: 'NONE'
+            }
+        });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to revoke' });
     }
 });
 
@@ -566,7 +611,7 @@ app.post('/api/user/premium', authenticateToken, async (req, res) => {
         const { depositorName } = req.body;
         // Request Premium (Set to PENDING)
         await (prisma as any).user.update({
-            where: { id: (req as any).user.userId },
+            where: { id: (req as any).user.id },
             data: {
                 premiumStatus: 'PENDING',
                 depositorName: depositorName
@@ -590,7 +635,33 @@ app.use((req, res) => {
     }
     res.sendFile(path.join(distPath, 'index.html'));
 });
+// --- AI Advice API ---
+app.post('/api/ai/advice', authenticateToken, async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
 
-app.listen(PORT, () => {
+        if (!apiKey) {
+            return res.status(500).json({ error: 'Server API Key not configured' });
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+            config: {
+                thinkingConfig: { includeThoughts: false }
+            }
+        });
+
+        res.json({ advice: response.text });
+    } catch (e: any) {
+        console.error("Gemini API Error:", e);
+        res.status(500).json({ error: 'Failed to generate advice', details: e.message });
+    }
+});
+
+// Start Server
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

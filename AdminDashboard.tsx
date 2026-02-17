@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Shield, Settings, AlertTriangle, Monitor, XCircle, CheckCircle } from 'lucide-react';
+import { Save, Shield, Settings, AlertTriangle, Monitor, XCircle, CheckCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { api } from './services/api';
 
 export const AdminDashboard: React.FC = () => {
@@ -10,17 +10,35 @@ export const AdminDashboard: React.FC = () => {
     const [adsEnabled, setAdsEnabled] = useState(false);
     const [adsenseId, setAdsenseId] = useState('');
     const [coupangHtml, setCoupangHtml] = useState('');
+    const [adsenseInterstitialId, setAdsenseInterstitialId] = useState('');
+    const [coupangInterstitialHtml, setCoupangInterstitialHtml] = useState('');
+    const [interstitialTimer, setInterstitialTimer] = useState('3');
+    const [interstitialWidth, setInterstitialWidth] = useState('512');
+    const [interstitialHeight, setInterstitialHeight] = useState('512');
     const [kakaoQrCode, setKakaoQrCode] = useState(''); // Base64
+
+    // Layout States
+    const [adWidth, setAdWidth] = useState('160');
+    const [adHeight, setAdHeight] = useState('600');
+    const [adMargin, setAdMargin] = useState('16');
+    const [adTop, setAdTop] = useState('50%');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Pending Deposits
+    // Donation Lists
     const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
+    const [approvedDonations, setApprovedDonations] = useState<any[]>([]);
 
-    const loadPendingDeposits = async () => {
+    const loadDonations = async () => {
         try {
-            const res = await fetch('/api/admin/pending-deposits');
-            const data = await res.json();
-            if (Array.isArray(data)) setPendingDeposits(data);
+            const [pendingRes, approvedRes] = await Promise.all([
+                fetch('/api/admin/pending-deposits'),
+                fetch('/api/admin/approved-donations')
+            ]);
+            const pendingData = await pendingRes.json();
+            const approvedData = await approvedRes.json();
+
+            if (Array.isArray(pendingData)) setPendingDeposits(pendingData);
+            if (Array.isArray(approvedData)) setApprovedDonations(approvedData);
         } catch (e) {
             console.error(e);
         }
@@ -32,7 +50,16 @@ export const AdminDashboard: React.FC = () => {
             setAdsEnabled(config['ADS_ENABLED'] === 'true');
             setAdsenseId(config['ADSENSE_SLOT_ID'] || '');
             setCoupangHtml(config['COUPANG_BANNER_HTML'] || '');
+            setAdsenseInterstitialId(config['ADSENSE_INTERSTITIAL_ID'] || '');
+            setCoupangInterstitialHtml(config['COUPANG_INTERSTITIAL_HTML'] || '');
+            setInterstitialTimer(config['AD_INTERSTITIAL_TIMER'] || '3');
+            setInterstitialWidth(config['AD_INTERSTITIAL_WIDTH'] || '512');
+            setInterstitialHeight(config['AD_INTERSTITIAL_HEIGHT'] || '512');
             setKakaoQrCode(config['KAKAO_PAY_QR'] || '');
+            setAdWidth(config['AD_SIDEBAR_WIDTH'] || '160');
+            setAdHeight(config['AD_SIDEBAR_HEIGHT'] || '600');
+            setAdMargin(config['AD_SIDEBAR_MARGIN'] || '16');
+            setAdTop(config['AD_SIDEBAR_TOP'] || '50%');
         } catch (e) {
             console.error("Failed to load config", e);
         }
@@ -41,7 +68,7 @@ export const AdminDashboard: React.FC = () => {
     useEffect(() => {
         // Load public config initially to see current state
         loadConfig();
-        if (isAuthenticated) loadPendingDeposits();
+        if (isAuthenticated) loadDonations();
     }, [isAuthenticated]);
 
     const approveDeposit = async (userId: string) => {
@@ -54,12 +81,31 @@ export const AdminDashboard: React.FC = () => {
             });
             if (res.ok) {
                 alert("승인되었습니다.");
-                loadPendingDeposits();
+                loadDonations();
             } else {
                 alert("실패했습니다.");
             }
         } catch (e) {
-            alert("오류가 발생했습니다.");
+            console.error(e);
+        }
+    };
+
+    const revokeDonation = async (userId: string) => {
+        if (!confirm("정말 승인을 취소하고 광고를 다시 노출하시겠습니까?")) return;
+        try {
+            const res = await fetch('/api/admin/revoke-donation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, password })
+            });
+            if (res.ok) {
+                alert("취소되었습니다.");
+                loadDonations();
+            } else {
+                alert("실패했습니다.");
+            }
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -79,7 +125,16 @@ export const AdminDashboard: React.FC = () => {
                 ADS_ENABLED: String(adsEnabled),
                 ADSENSE_SLOT_ID: adsenseId,
                 COUPANG_BANNER_HTML: coupangHtml,
-                KAKAO_PAY_QR: kakaoQrCode
+                KAKAO_PAY_QR: kakaoQrCode,
+                AD_SIDEBAR_WIDTH: adWidth,
+                AD_SIDEBAR_HEIGHT: adHeight,
+                AD_SIDEBAR_MARGIN: adMargin,
+                AD_SIDEBAR_TOP: adTop,
+                ADSENSE_INTERSTITIAL_ID: adsenseInterstitialId,
+                COUPANG_INTERSTITIAL_HTML: coupangInterstitialHtml,
+                AD_INTERSTITIAL_TIMER: interstitialTimer,
+                AD_INTERSTITIAL_WIDTH: interstitialWidth,
+                AD_INTERSTITIAL_HEIGHT: interstitialHeight
             });
             alert("설정이 저장되었습니다.");
         } catch (e) {
@@ -134,20 +189,20 @@ export const AdminDashboard: React.FC = () => {
             <main className="max-w-4xl mx-auto p-6 space-y-6">
 
                 {/* Deposit Requests */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center gap-2">
-                        <Monitor size={20} className="text-indigo-600" />
-                        <h2 className="font-bold text-indigo-900">입금 확인 요청 ({pendingDeposits.length})</h2>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                    <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <Monitor size={20} className="text-slate-500" />
+                        <h2 className="font-bold text-indigo-900">후원 확인 요청 ({pendingDeposits.length})</h2>
                     </div>
                     <div className="p-0">
                         {pendingDeposits.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400 text-sm">대기 중인 요청이 없습니다.</div>
+                            <div className="p-8 text-center text-slate-400 text-sm">대기 중인 후원 요청이 없습니다.</div>
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {pendingDeposits.map(user => (
                                     <div key={user.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                                         <div>
-                                            <div className="font-bold text-slate-800">{user.name} <span className="text-slate-400 font-normal text-xs">({user.email})</span></div>
+                                            <div className="font-bold text-slate-800">{user.email}</div>
                                             <div className="text-sm text-indigo-600 font-bold mt-0.5">입금자명: {user.depositorName || '(미입력)'}</div>
                                             <div className="text-xs text-slate-500">{new Date(user.createdAt).toLocaleDateString()} 가입</div>
                                         </div>
@@ -156,6 +211,37 @@ export const AdminDashboard: React.FC = () => {
                                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors"
                                         >
                                             승인하기
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Approved Donations List */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                    <div className="bg-emerald-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                        <CheckCircle size={20} className="text-emerald-600" />
+                        <h2 className="font-bold text-emerald-900">승인된 후원 ({approvedDonations.length})</h2>
+                    </div>
+                    <div className="p-0">
+                        {approvedDonations.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 text-sm">승인된 후원이 없습니다.</div>
+                        ) : (
+                            <div className="divide-y divide-slate-100">
+                                {approvedDonations.map(user => (
+                                    <div key={user.id} className="p-4 flex items-center justify-between hover:bg-emerald-50/30 transition-colors">
+                                        <div>
+                                            <div className="font-bold text-slate-800">{user.email}</div>
+                                            <div className="text-sm text-emerald-600 font-bold mt-0.5">입금자명: {user.depositorName || '(미입력)'}</div>
+                                            <div className="text-xs text-slate-500">{new Date(user.createdAt).toLocaleDateString()} 가입</div>
+                                        </div>
+                                        <button
+                                            onClick={() => revokeDonation(user.id)}
+                                            className="bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                                        >
+                                            <RotateCcw size={14} /> 승인 취소
                                         </button>
                                     </div>
                                 ))}
@@ -207,14 +293,89 @@ export const AdminDashboard: React.FC = () => {
 
                         {/* Coupang */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">Coupang Partners HTML</label>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">사이드바: Coupang Partners HTML</label>
                             <textarea
                                 value={coupangHtml}
                                 onChange={e => setCoupangHtml(e.target.value)}
                                 placeholder="<iframe>...</iframe>"
                                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm h-32 resize-none"
                             />
-                            <p className="text-xs text-slate-400 mt-1">쿠팡 파트너스에서 생성한 iframe 코드를 붙여넣으세요.</p>
+                            <p className="text-xs text-slate-400 mt-1">사이드바용 쿠팡 파트너스 iframe 코드를 붙여넣으세요.</p>
+                        </div>
+
+                        {/* Interstitial Settings */}
+                        <div className="pt-6 border-t border-slate-100 space-y-6">
+                            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <Sparkles size={16} className="text-indigo-500" />
+                                전면 광고 설정 (팝업)
+                            </h3>
+
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">Google AdSense 전면 Slot ID</label>
+                                <input
+                                    type="text"
+                                    value={adsenseInterstitialId}
+                                    onChange={e => setAdsenseInterstitialId(e.target.value)}
+                                    placeholder="전면 광고용 슬롯 ID"
+                                    className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">전면 광고 노출 시간 (초)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="60"
+                                        value={interstitialTimer}
+                                        onChange={e => setInterstitialTimer(e.target.value)}
+                                        className="w-24 px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm"
+                                    />
+                                    <span className="text-sm text-slate-500 font-bold">초</span>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">광고 창이 열린 후 닫기 버튼이 활성화될 때까지의 시간입니다. (기본: 3초)</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">팝업 너비 (Width)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={interstitialWidth}
+                                            onChange={e => setInterstitialWidth(e.target.value)}
+                                            placeholder="512"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+                                        />
+                                        <span className="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">팝업 높이 (Height)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={interstitialHeight}
+                                            onChange={e => setInterstitialHeight(e.target.value)}
+                                            placeholder="512"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+                                        />
+                                        <span className="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">전면: Coupang Partners HTML</label>
+                                <textarea
+                                    value={coupangInterstitialHtml}
+                                    onChange={e => setCoupangInterstitialHtml(e.target.value)}
+                                    placeholder="<iframe>...</iframe>"
+                                    className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm h-32 resize-none"
+                                />
+                                <p className="text-xs text-slate-400 mt-1">전면 팝업용 쿠팡 파트너스 iframe 코드를 붙여넣으세요.</p>
+                            </div>
                         </div>
                         {/* KakaoPay QR */}
                         <div>
@@ -245,6 +406,69 @@ export const AdminDashboard: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Sidebar Layout Settings */}
+                        <div className="pt-6 border-t border-slate-100">
+                            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <Settings size={16} className="text-slate-400" />
+                                사이드바 레이아웃 설정
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">너비 (Width)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={adWidth}
+                                            onChange={e => setAdWidth(e.target.value)}
+                                            placeholder="160"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                        />
+                                        <span className="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">높이 (Height)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={adHeight}
+                                            onChange={e => setAdHeight(e.target.value)}
+                                            placeholder="600"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                        />
+                                        <span className="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">좌우 여백 (Margin)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={adMargin}
+                                            onChange={e => setAdMargin(e.target.value)}
+                                            placeholder="16"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                        />
+                                        <span className="text-xs text-slate-400">px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1.5">상단 위치 (Top)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={adTop}
+                                            onChange={e => setAdTop(e.target.value)}
+                                            placeholder="50%"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                        />
+                                        <span className="text-xs text-slate-400">px/%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2">* 상단 위치에 %를 사용하면 화면 중앙 정렬이 용이합니다 (예: 50%).</p>
                         </div>
 
                     </div>
