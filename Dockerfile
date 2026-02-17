@@ -37,4 +37,4 @@ COPY --from=frontend-build /app/authMiddleware.ts ./
 RUN npx prisma generate
 
 EXPOSE 4000
-CMD ["npx", "tsx", "server.ts"]
+CMD ["sh", "-c", "npx prisma db push && npx tsx server.ts"]
