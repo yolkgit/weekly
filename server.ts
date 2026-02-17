@@ -22,6 +22,25 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// --- Debug API ---
+app.get('/api/debug/status', async (req, res) => {
+    try {
+        const tables = await (prisma as any).$queryRaw`SHOW TABLES`;
+        const userCount = await (prisma as any).user.count();
+        res.json({
+            status: 'ok',
+            tables,
+            userCount,
+            env: {
+                // Safe env vars only
+                NODE_ENV: process.env.NODE_ENV
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'DB Connection Failed', details: (e as any).message });
+    }
+});
+
 // --- Auth API ---
 
 app.post('/api/auth/signup', async (req, res) => {
