@@ -10,50 +10,57 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+enum PremiumStatus {
+  NONE
+  PENDING
+  APPROVED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  parentPassword String @default("0000")
-  children  Child[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isPremium Boolean  @default(false)
-  premiumStatus String @default("NONE") // NONE, PENDING, APPROVED
-  depositorName String?
-  premiumExpiry DateTime?
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  parentPassword String
+  children       Child[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  isPremium      Boolean       @default(false)
+  premiumStatus  PremiumStatus @default(NONE)
+  depositorName  String?
+  premiumExpiry  DateTime?
 }
 
 model Child {
-  id           String         @id @default(uuid())
-  userId       String?
-  user         User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name         String
-  color        String
-  grade        String?
-  isPlanConfirmed Boolean        @default(false)
-  startTime    String         @default("09:00")
-  endTime      String         @default("21:00")
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  timeSlots    TimeSlot[]
-  pointLogs    PointUsageLog[]
-  rewardConfig RewardConfig?
-  snapshots    ScheduleSnapshot[]
+  id              String             @id @default(uuid())
+  userId          String?
+  user            User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  color           String
+  grade           String?
+  isPlanConfirmed Boolean            @default(false)
+  startTime       String             @default("09:00")
+  endTime         String             @default("21:00")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  timeSlots       TimeSlot[]
+  pointLogs       PointUsageLog[]
+  rewardConfig    RewardConfig?
+  snapshots       ScheduleSnapshot[]
 }
 
 model TimeSlot {
-  id              String   @id @default(uuid())
+  id              String     @id @default(uuid())
   childId         String
-  child           Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  child           Child      @relation(fields: [childId], references: [id], onDelete: Cascade)
   dayIndex        Int
   startTime       String
   durationMinutes Int
   activity        String
-  type            String   // 'study' | 'academy' | 'school' | 'routine' | 'rest' | 'etc'
-  status          String   @default("pending") // 'pending' | 'completed' | 'verified'
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  type            String // 'study' | 'academy' | 'school' | 'routine' | 'rest' | 'etc'
+  status          String     @default("pending")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model PointUsageLog {

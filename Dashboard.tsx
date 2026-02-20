@@ -333,6 +333,16 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
         }
     };
 
+    const handleDeleteLog = async (logId: string) => {
+        try {
+            await api.deleteLog(logId);
+            setUsageLogs(prev => prev.filter(log => log.id !== logId));
+        } catch (e) {
+            console.error("Failed to delete log:", e);
+            alert("내역 삭제에 실패했습니다.");
+        }
+    };
+
     const handleLoadTemplate = (type: GradeLevel) => {
         // Immediate update without confirmation as requested
         const newSchedule = getRecommendedSchedule(type);
@@ -1113,6 +1123,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                 onRewardConfigChange={handleRewardConfigUpdate}
                 usageLogs={usageLogs}
                 isParentMode={isParentMode}
+                onDeleteLog={handleDeleteLog}
             />
 
             {/* Child Management Modal */}

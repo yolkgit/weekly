@@ -27,8 +27,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // --- Debug API ---
 app.get('/api/debug/status', async (req, res) => {
     try {
-        const tables = await (prisma as any).$queryRaw`SHOW TABLES`;
-        const userCount = await (prisma as any).user.count();
+        const tables = await prisma.$queryRaw`SHOW TABLES`;
+        const userCount = await prisma.user.count();
         res.json({
             status: 'ok',
             tables,
@@ -52,15 +52,18 @@ app.post('/api/auth/signup', async (req, res) => {
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
         console.log("Checking for existing user...");
-        const existingUser = await (prisma as any).user.findUnique({ where: { email } });
+        const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
         console.log("Hashing password...");
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        console.log("Generating initial parent password...");
+        const initialParentPassword = Math.floor(1000 + Math.random() * 9000).toString();
+
         console.log("Creating user in DB...");
-        const user = await (prisma as any).user.create({
-            data: { email, password: hashedPassword }
+        const user = await prisma.user.create({
+            data: { email, password: hashedPassword, parentPassword: initialParentPassword }
         });
 
         console.log("Signing token...");
@@ -80,7 +83,7 @@ app.post('/api/auth/login', async (req, res) => {
         const { email, password } = req.body;
 
         console.log("Finding user...");
-        const user = await (prisma as any).user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return res.status(400).json({ error: 'User not found' });
 
         console.log("Comparing password...");
@@ -104,7 +107,7 @@ app.post('/api/auth/parent-password', authenticateToken, async (req: AuthRequest
     }
 
     try {
-        await (prisma as any).user.update({
+        await prisma.user.update({
             where: { id: (req as any).user!.id },
             data: { parentPassword }
         });
@@ -124,7 +127,7 @@ app.get('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
             whereClause.childId = childId;
         }
 
-        const snapshots = await (prisma as any).scheduleSnapshot.findMany({
+        const snapshots = await prisma.scheduleSnapshot.findMany({
             where: whereClause,
             orderBy: { createdAt: 'desc' }
         });
@@ -139,11 +142,11 @@ app.post('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
     try {
         // Verify child owns by user
         const child = await prisma.child.findFirst({
-            where: { id: childId as string, userId: (req as any).user!.id } as any
+            where: { id: childId as string, userId: (req as any).user!.id }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
-        const snapshot = await (prisma as any).scheduleSnapshot.create({
+        const snapshot = await prisma.scheduleSnapshot.create({
             data: { childId: childId as string, name, date, schedule }
         });
         res.json(snapshot);
@@ -154,12 +157,12 @@ app.post('/api/snapshots', authenticateToken, async (req: AuthRequest, res) => {
 
 app.delete('/api/snapshots/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
-        const snapshot = await (prisma as any).scheduleSnapshot.findFirst({
+        const snapshot = await prisma.scheduleSnapshot.findFirst({
             where: { id: req.params.id as string, child: { userId: (req as any).user!.id } }
         });
         if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
 
-        await (prisma as any).scheduleSnapshot.delete({ where: { id: req.params.id as string } });
+        await prisma.scheduleSnapshot.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to delete snapshot' });
@@ -173,7 +176,7 @@ app.get('/api/children', authenticateToken, async (req: AuthRequest, res) => {
     try {
         console.log(`Fetching children for user: ${(req as any).user!.id}`);
         const children = await prisma.child.findMany({
-            where: { userId: (req as any).user!.id } as any,
+            where: { userId: (req as any).user!.id },
             include: {
                 rewardConfig: true
             },
@@ -202,8 +205,8 @@ app.post('/api/children', authenticateToken, async (req: AuthRequest, res) => {
                 rewardConfig: {
                     create: {}
                 }
-            } as any,
-            include: { rewardConfig: true } as any
+            },
+            include: { rewardConfig: true }
         });
 
         res.json(child);
@@ -220,7 +223,7 @@ app.put('/api/children/:id', authenticateToken, async (req: AuthRequest, res) =>
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id: id as string, user: { id: (req as any).user!.id } } as any
+            where: { id: id as string, user: { id: (req as any).user!.id } }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -236,7 +239,7 @@ app.put('/api/children/:id', authenticateToken, async (req: AuthRequest, res) =>
                 endTime: endTime as string,
                 isPlanConfirmed: !!isPlanConfirmed,
                 updatedAt: new Date()
-            } as any
+            }
         });
         res.json(updated);
     } catch (error) {
@@ -250,7 +253,7 @@ app.delete('/api/children/:id', authenticateToken, async (req: AuthRequest, res)
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id: id as string, user: { id: (req as any).user!.id } } as any
+            where: { id: id as string, user: { id: (req as any).user!.id } }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -271,7 +274,7 @@ app.get('/api/schedules', authenticateToken, async (req: AuthRequest, res) => {
 
     // Verify ownership
     const child = await prisma.child.findFirst({
-        where: { id: childId, user: { id: (req as any).user!.id } } as any
+        where: { id: childId, user: { id: (req as any).user!.id } }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -295,48 +298,82 @@ app.post('/api/schedules/batch', authenticateToken, async (req: AuthRequest, res
 
     // Verify ownership
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
     try {
-        const slotIds = slots.filter((s: any) => s.id).map((s: any) => s.id);
+        const incomingSlots = slots;
+        const incomingSlotIds = incomingSlots.filter((s: any) => s.id).map((s: any) => s.id);
 
-        // 1. Delete slots that are not in the new list
-        const deleteOp = prisma.timeSlot.deleteMany({
-            where: {
-                childId,
-                id: { notIn: slotIds }
-            }
+        // Fetch existing slots
+        const existingSlots = await prisma.timeSlot.findMany({
+            where: { childId }
         });
 
-        // 2. Upsert (Create or Update) all slots in the new list
-        const upsertOps = slots.map((slot: any) => {
+        // 1. Delete slots that are no longer present
+        const slotsToDelete = existingSlots.filter(
+            (existing) => !incomingSlotIds.includes(existing.id)
+        );
+
+        const deleteOps = slotsToDelete.map((slot: any) =>
+            prisma.timeSlot.delete({ where: { id: slot.id } })
+        );
+
+        // 2. Classify Creates and Updates
+        const updateOps: any[] = [];
+        const createOps: any[] = [];
+
+        for (const incomingSlot of incomingSlots) {
             const data = {
                 childId,
-                dayIndex: slot.dayIndex,
-                startTime: slot.startTime,
-                durationMinutes: slot.durationMinutes,
-                activity: slot.activity,
-                type: slot.type,
-                status: slot.status
+                dayIndex: incomingSlot.dayIndex,
+                startTime: incomingSlot.startTime,
+                durationMinutes: incomingSlot.durationMinutes,
+                activity: incomingSlot.activity,
+                type: incomingSlot.type,
+                status: incomingSlot.status,
             };
 
-            // Ensure we use the provided ID if available (for stability)
-            // If it's a new slot from frontend with UUID, we definitely want to use that ID.
-            if (slot.id) {
-                return prisma.timeSlot.upsert({
-                    where: { id: slot.id as string },
-                    update: { ...data, updatedAt: new Date() },
-                    create: { ...data, id: slot.id as string } // Use the provided ID!
-                });
-            } else {
-                // Fallback for missing ID (shouldn't happen with updated frontend)
-                return prisma.timeSlot.create({ data });
-            }
-        });
+            const existingSlot = existingSlots.find((s) => s.id === incomingSlot.id);
 
-        const result = await prisma.$transaction([deleteOp, ...upsertOps]);
+            if (existingSlot) {
+                // Check if anything actually changed
+                const hasChanged =
+                    existingSlot.dayIndex !== data.dayIndex ||
+                    existingSlot.startTime !== data.startTime ||
+                    existingSlot.durationMinutes !== data.durationMinutes ||
+                    existingSlot.activity !== data.activity ||
+                    existingSlot.type !== data.type ||
+                    existingSlot.status !== data.status;
+
+                if (hasChanged) {
+                    updateOps.push(
+                        prisma.timeSlot.update({
+                            where: { id: existingSlot.id },
+                            data: { ...data, updatedAt: new Date() },
+                        })
+                    );
+                }
+            } else {
+                // Completely new slot (doesn't exist in DB)
+                createOps.push(
+                    prisma.timeSlot.create({
+                        data: incomingSlot.id
+                            ? { ...data, id: incomingSlot.id as string }
+                            : data,
+                    })
+                );
+            }
+        }
+
+        // Execute all required operations atomically
+        const result = await prisma.$transaction([
+            ...deleteOps,
+            ...updateOps,
+            ...createOps,
+        ]);
+
         res.json(result);
     } catch (error) {
         console.error("Batch save error:", error);
@@ -368,7 +405,7 @@ app.delete('/api/schedules/all/:childId', authenticateToken, async (req: AuthReq
     try {
         // Verify ownership
         const child = await prisma.child.findFirst({
-            where: { id: childId, userId: (req as any).user!.id } as any
+            where: { id: childId, userId: (req as any).user!.id }
         });
         if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -386,7 +423,7 @@ app.get('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
     if (!childId) return res.status(400).json([]);
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -406,23 +443,37 @@ app.post('/api/logs', authenticateToken, async (req: AuthRequest, res) => {
     const { childId, amount, reason } = req.body;
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
     try {
+        if (amount < 0) {
+            const aggregate = await prisma.pointUsageLog.aggregate({
+                where: { childId },
+                _sum: { amount: true }
+            });
+            const currentTotal = aggregate._sum.amount || 0;
+
+            if (currentTotal + amount < 0) {
+                return res.status(400).json({ error: '포인트가 부족합니다' });
+            }
+        }
+
         const log = await prisma.pointUsageLog.create({
             data: { childId, amount, reason, timestamp: new Date() }
         });
         res.json(log);
-    } catch (error) { }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add log' });
+    }
 });
 
 app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => {
-    const childId = req.body.childId as string | undefined;
+    const { childId } = req.body;
 
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -434,12 +485,32 @@ app.post('/api/logs/reset', authenticateToken, async (req: AuthRequest, res) => 
     }
 });
 
+app.delete('/api/logs/item/:logId', authenticateToken, async (req: AuthRequest, res) => {
+    const logId = req.params.logId as string;
+
+    try {
+        const log = await prisma.pointUsageLog.findUnique({
+            where: { id: logId },
+            include: { child: true }
+        });
+
+        if (!log || (log.child as any).userId !== (req as any).user!.id) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        await prisma.pointUsageLog.delete({ where: { id: logId } });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete log' });
+    }
+});
+
 // --- Reward Config (Protected) ---
 
 app.get('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
     const childId = req.params.childId as string;
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -456,7 +527,7 @@ app.get('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
 app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res) => {
     const childId = req.params.childId as string;
     const child = await prisma.child.findFirst({
-        where: { id: childId, userId: (req as any).user!.id } as any
+        where: { id: childId, userId: (req as any).user!.id }
     });
     if (!child) return res.status(403).json({ error: 'Unauthorized' });
 
@@ -465,8 +536,8 @@ app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
     try {
         const config = await prisma.rewardConfig.upsert({
             where: { childId: childId },
-            update: { mode, unit, study, academy, school, routine, rest, sleep } as any,
-            create: { childId, mode, unit, study, academy, school, routine, rest, sleep } as any
+            update: { mode, unit, study, academy, school, routine, rest, sleep },
+            create: { childId, mode, unit, study, academy, school, routine, rest, sleep }
         });
         res.json(config);
     } catch (e) {
@@ -479,7 +550,7 @@ app.put('/api/rewards/:childId', authenticateToken, async (req: AuthRequest, res
 // Public Config (for Frontend)
 app.get('/api/public/config', async (req, res) => {
     try {
-        const configs = await (prisma as any).appConfig.findMany();
+        const configs = await prisma.appConfig.findMany();
         const configMap: Record<string, string> = {};
         configs.forEach((c: any) => {
             configMap[c.key] = c.value;
@@ -493,25 +564,25 @@ app.get('/api/public/config', async (req, res) => {
 // --- Admin API ---
 app.post('/api/admin/config', async (req, res) => {
     const { password } = req.body;
-    if (password !== 'admin1234') {
+    if (password !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR, AD_SIDEBAR_WIDTH, AD_SIDEBAR_HEIGHT, AD_SIDEBAR_MARGIN, AD_SIDEBAR_TOP, ADSENSE_INTERSTITIAL_ID, COUPANG_INTERSTITIAL_HTML, AD_INTERSTITIAL_TIMER, AD_INTERSTITIAL_WIDTH, AD_INTERSTITIAL_HEIGHT } = req.body;
 
     try {
-        if (ADS_ENABLED !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADS_ENABLED' }, update: { value: ADS_ENABLED }, create: { key: 'ADS_ENABLED', value: ADS_ENABLED } });
-        if (ADSENSE_SLOT_ID !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADSENSE_SLOT_ID' }, update: { value: ADSENSE_SLOT_ID }, create: { key: 'ADSENSE_SLOT_ID', value: ADSENSE_SLOT_ID } });
-        if (COUPANG_BANNER_HTML !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'COUPANG_BANNER_HTML' }, update: { value: COUPANG_BANNER_HTML }, create: { key: 'COUPANG_BANNER_HTML', value: COUPANG_BANNER_HTML } });
-        if (KAKAO_PAY_QR !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'KAKAO_PAY_QR' }, update: { value: KAKAO_PAY_QR }, create: { key: 'KAKAO_PAY_QR', value: KAKAO_PAY_QR } });
-        if (AD_SIDEBAR_WIDTH !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_WIDTH' }, update: { value: AD_SIDEBAR_WIDTH }, create: { key: 'AD_SIDEBAR_WIDTH', value: AD_SIDEBAR_WIDTH } });
-        if (AD_SIDEBAR_HEIGHT !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_HEIGHT' }, update: { value: AD_SIDEBAR_HEIGHT }, create: { key: 'AD_SIDEBAR_HEIGHT', value: AD_SIDEBAR_HEIGHT } });
-        if (AD_SIDEBAR_MARGIN !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_MARGIN' }, update: { value: AD_SIDEBAR_MARGIN }, create: { key: 'AD_SIDEBAR_MARGIN', value: AD_SIDEBAR_MARGIN } });
-        if (AD_SIDEBAR_TOP !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_SIDEBAR_TOP' }, update: { value: AD_SIDEBAR_TOP }, create: { key: 'AD_SIDEBAR_TOP', value: AD_SIDEBAR_TOP } });
-        if (ADSENSE_INTERSTITIAL_ID !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'ADSENSE_INTERSTITIAL_ID' }, update: { value: ADSENSE_INTERSTITIAL_ID }, create: { key: 'ADSENSE_INTERSTITIAL_ID', value: ADSENSE_INTERSTITIAL_ID } });
-        if (COUPANG_INTERSTITIAL_HTML !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'COUPANG_INTERSTITIAL_HTML' }, update: { value: COUPANG_INTERSTITIAL_HTML }, create: { key: 'COUPANG_INTERSTITIAL_HTML', value: COUPANG_INTERSTITIAL_HTML } });
-        if (AD_INTERSTITIAL_TIMER !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_TIMER' }, update: { value: AD_INTERSTITIAL_TIMER }, create: { key: 'AD_INTERSTITIAL_TIMER', value: AD_INTERSTITIAL_TIMER } });
-        if (AD_INTERSTITIAL_WIDTH !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_WIDTH' }, update: { value: AD_INTERSTITIAL_WIDTH }, create: { key: 'AD_INTERSTITIAL_WIDTH', value: AD_INTERSTITIAL_WIDTH } });
-        if (AD_INTERSTITIAL_HEIGHT !== undefined) await (prisma as any).appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_HEIGHT' }, update: { value: AD_INTERSTITIAL_HEIGHT }, create: { key: 'AD_INTERSTITIAL_HEIGHT', value: AD_INTERSTITIAL_HEIGHT } });
+        if (ADS_ENABLED !== undefined) await prisma.appConfig.upsert({ where: { key: 'ADS_ENABLED' }, update: { value: ADS_ENABLED }, create: { key: 'ADS_ENABLED', value: ADS_ENABLED } });
+        if (ADSENSE_SLOT_ID !== undefined) await prisma.appConfig.upsert({ where: { key: 'ADSENSE_SLOT_ID' }, update: { value: ADSENSE_SLOT_ID }, create: { key: 'ADSENSE_SLOT_ID', value: ADSENSE_SLOT_ID } });
+        if (COUPANG_BANNER_HTML !== undefined) await prisma.appConfig.upsert({ where: { key: 'COUPANG_BANNER_HTML' }, update: { value: COUPANG_BANNER_HTML }, create: { key: 'COUPANG_BANNER_HTML', value: COUPANG_BANNER_HTML } });
+        if (KAKAO_PAY_QR !== undefined) await prisma.appConfig.upsert({ where: { key: 'KAKAO_PAY_QR' }, update: { value: KAKAO_PAY_QR }, create: { key: 'KAKAO_PAY_QR', value: KAKAO_PAY_QR } });
+        if (AD_SIDEBAR_WIDTH !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_SIDEBAR_WIDTH' }, update: { value: AD_SIDEBAR_WIDTH }, create: { key: 'AD_SIDEBAR_WIDTH', value: AD_SIDEBAR_WIDTH } });
+        if (AD_SIDEBAR_HEIGHT !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_SIDEBAR_HEIGHT' }, update: { value: AD_SIDEBAR_HEIGHT }, create: { key: 'AD_SIDEBAR_HEIGHT', value: AD_SIDEBAR_HEIGHT } });
+        if (AD_SIDEBAR_MARGIN !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_SIDEBAR_MARGIN' }, update: { value: AD_SIDEBAR_MARGIN }, create: { key: 'AD_SIDEBAR_MARGIN', value: AD_SIDEBAR_MARGIN } });
+        if (AD_SIDEBAR_TOP !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_SIDEBAR_TOP' }, update: { value: AD_SIDEBAR_TOP }, create: { key: 'AD_SIDEBAR_TOP', value: AD_SIDEBAR_TOP } });
+        if (ADSENSE_INTERSTITIAL_ID !== undefined) await prisma.appConfig.upsert({ where: { key: 'ADSENSE_INTERSTITIAL_ID' }, update: { value: ADSENSE_INTERSTITIAL_ID }, create: { key: 'ADSENSE_INTERSTITIAL_ID', value: ADSENSE_INTERSTITIAL_ID } });
+        if (COUPANG_INTERSTITIAL_HTML !== undefined) await prisma.appConfig.upsert({ where: { key: 'COUPANG_INTERSTITIAL_HTML' }, update: { value: COUPANG_INTERSTITIAL_HTML }, create: { key: 'COUPANG_INTERSTITIAL_HTML', value: COUPANG_INTERSTITIAL_HTML } });
+        if (AD_INTERSTITIAL_TIMER !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_TIMER' }, update: { value: AD_INTERSTITIAL_TIMER }, create: { key: 'AD_INTERSTITIAL_TIMER', value: AD_INTERSTITIAL_TIMER } });
+        if (AD_INTERSTITIAL_WIDTH !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_WIDTH' }, update: { value: AD_INTERSTITIAL_WIDTH }, create: { key: 'AD_INTERSTITIAL_WIDTH', value: AD_INTERSTITIAL_WIDTH } });
+        if (AD_INTERSTITIAL_HEIGHT !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_HEIGHT' }, update: { value: AD_INTERSTITIAL_HEIGHT }, create: { key: 'AD_INTERSTITIAL_HEIGHT', value: AD_INTERSTITIAL_HEIGHT } });
 
         res.json({ success: true });
     } catch (e) {
@@ -521,7 +592,7 @@ app.post('/api/admin/config', async (req, res) => {
 
 app.get('/api/admin/pending-deposits', async (req, res) => {
     try {
-        const users = await (prisma as any).user.findMany({
+        const users = await prisma.user.findMany({
             where: { premiumStatus: 'PENDING' },
             select: { id: true, email: true, premiumStatus: true, depositorName: true, createdAt: true }
         });
@@ -534,16 +605,20 @@ app.get('/api/admin/pending-deposits', async (req, res) => {
 
 app.post('/api/admin/approve-deposit', async (req, res) => {
     const { userId, password } = req.body;
-    if (password !== 'admin1234') {
+    if (password !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
     try {
-        await (prisma as any).user.update({
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 30); // 30-day Premium expiry
+
+        await prisma.user.update({
             where: { id: userId },
             data: {
                 isPremium: true,
-                premiumStatus: 'APPROVED'
+                premiumStatus: 'APPROVED',
+                premiumExpiry: expiryDate
             }
         });
         res.json({ success: true });
@@ -554,7 +629,7 @@ app.post('/api/admin/approve-deposit', async (req, res) => {
 
 app.get('/api/admin/approved-donations', async (req, res) => {
     try {
-        const users = await (prisma as any).user.findMany({
+        const users = await prisma.user.findMany({
             where: { premiumStatus: 'APPROVED' },
             select: { id: true, email: true, premiumStatus: true, depositorName: true, createdAt: true }
         });
@@ -567,12 +642,12 @@ app.get('/api/admin/approved-donations', async (req, res) => {
 
 app.post('/api/admin/revoke-donation', async (req, res) => {
     const { userId, password } = req.body;
-    if (password !== 'admin1234') {
+    if (password !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
     try {
-        await (prisma as any).user.update({
+        await prisma.user.update({
             where: { id: userId },
             data: {
                 isPremium: false,
@@ -589,7 +664,7 @@ app.post('/api/admin/revoke-donation', async (req, res) => {
 
 app.get('/api/user/me', authenticateToken, async (req: AuthRequest, res) => {
     try {
-        const user = await (prisma as any).user.findUnique({
+        const user = await prisma.user.findUnique({
             where: { id: (req as any).user!.id }
         });
         if (!user) return res.status(404).json({ error: 'User not found' });
@@ -598,7 +673,7 @@ app.get('/api/user/me', authenticateToken, async (req: AuthRequest, res) => {
             id: user.id,
             email: user.email,
             isPremium: !!user.isPremium,
-            premiumStatus: (user as any).premiumStatus || 'NONE',
+            premiumStatus: user.premiumStatus || 'NONE',
             premiumExpiry: user.premiumExpiry
         });
     } catch (e) {
@@ -610,7 +685,7 @@ app.post('/api/user/premium', authenticateToken, async (req, res) => {
     try {
         const { depositorName } = req.body;
         // Request Premium (Set to PENDING)
-        await (prisma as any).user.update({
+        await prisma.user.update({
             where: { id: (req as any).user.id },
             data: {
                 premiumStatus: 'PENDING',

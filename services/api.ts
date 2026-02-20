@@ -1,9 +1,9 @@
 
 import { ChildProfile, TimeSlot, PointUsageLog, RewardConfig } from '../types';
 
-const API_BASE = window.location.origin.includes('localhost:3000')
+const API_BASE = import.meta.env.VITE_API_URL || (window.location.origin.includes('localhost')
     ? 'http://localhost:4000/api'
-    : '/api';
+    : '/api');
 
 const getHeaders = () => {
     const token = localStorage.getItem('token');
@@ -175,11 +175,20 @@ export const api = {
     },
 
     resetLogs: async (childId: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/logs/${childId}`, {
+        const res = await fetch(`${API_BASE}/logs/reset`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ childId })
+        });
+        if (!res.ok) throw new Error('Failed to reset logs');
+    },
+
+    deleteLog: async (logId: string): Promise<void> => {
+        const res = await fetch(`${API_BASE}/logs/item/${logId}`, {
             method: 'DELETE',
             headers: getHeaders()
         });
-        if (!res.ok) throw new Error('Failed to reset logs');
+        if (!res.ok) throw new Error('Failed to delete log');
     },
 
     getRewardConfig: async (childId: string): Promise<RewardConfig> => {

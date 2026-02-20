@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Gamepad2, MinusCircle, RotateCcw, Settings, Coins, Clock, History, Calendar, AlertTriangle, Lock, Edit3 } from 'lucide-react';
+import { X, Gamepad2, MinusCircle, RotateCcw, Settings, Coins, Clock, History, Calendar, AlertTriangle, Lock, Edit3, Trash2 } from 'lucide-react';
 import { RewardMode, PointUsageLog, RewardConfig, ActivityType } from '../types';
 
 interface GameTimeModalProps {
@@ -15,6 +15,7 @@ interface GameTimeModalProps {
     onRewardConfigChange?: (config: RewardConfig) => void;
     usageLogs: PointUsageLog[];
     isParentMode: boolean;
+    onDeleteLog?: (logId: string) => void;
 }
 
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
@@ -29,7 +30,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
 export const GameTimeModal: React.FC<GameTimeModalProps> = ({
     isOpen, onClose, earnedPoints, usedPoints, onUsePoints, onResetUsed,
     rewardConfig, onRewardConfigChange,
-    usageLogs, isParentMode
+    usageLogs, isParentMode, onDeleteLog
 }) => {
     const [customAmount, setCustomAmount] = useState('');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -309,14 +310,29 @@ export const GameTimeModal: React.FC<GameTimeModalProps> = ({
                             ) : (
                                 <div className="divide-y divide-slate-100">
                                     {usageLogs.map((log) => (
-                                        <div key={log.id} className="flex justify-between items-center p-3 text-sm">
+                                        <div key={log.id} className="flex justify-between items-center p-3 text-sm hover:bg-slate-100 transition-colors group">
                                             <div className="flex items-center gap-2 text-slate-500">
                                                 <Calendar size={12} />
                                                 <span className="text-xs">{formatDate(log.timestamp)}</span>
                                                 {log.reason && <span className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">{log.reason}</span>}
                                             </div>
-                                            <div className="font-bold text-rose-500">
-                                                - {formatLogValue(log.amount)}
+                                            <div className="flex items-center gap-3">
+                                                <div className="font-bold text-rose-500">
+                                                    - {formatLogValue(log.amount)}
+                                                </div>
+                                                {isParentMode && onDeleteLog && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm("이 기록을 삭제하시겠습니까? (차감된 포인트가 복구됩니다.)")) {
+                                                                onDeleteLog(log.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="기록 삭제"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

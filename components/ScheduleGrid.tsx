@@ -50,7 +50,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
   }, [isDragging, dragCurrent]);
 
   const handleMouseDown = (day: number, time: string) => {
-    if (isPlanConfirmed) return; // Disable drag if plan is confirmed
+    if (isPlanConfirmed && !isParentMode) return; // Disable drag if plan is confirmed and not parent
     setIsDragging(true);
     setDragStart({ day, time });
     setDragCurrent({ day, time });
@@ -58,6 +58,7 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
 
   const handleMouseEnter = (day: number, time: string) => {
     if (isDragging) {
+      if (isPlanConfirmed) return; // Prevent range dragging in confirmed mode (even for parents)
       setDragCurrent({ day, time });
     }
   };

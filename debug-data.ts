@@ -26,14 +26,14 @@ async function main() {
 
         console.log('\n- Schedule Summary:');
         schedule.forEach(slot => {
-            if (slot.status === 'completed' || slot.status === 'failed') {
+            if (slot.status === 'COMPLETED' || (slot.status as any) === 'FAILED') {
                 const points = (child.rewardConfig as any)[slot.type] || 0;
 
-                if (slot.status === 'completed') {
+                if (slot.status === 'COMPLETED') {
                     calculatedScore += points;
                     completedCount++;
                     console.log(`  [COMPLETED] ${slot.activity} (${slot.type}): +${points}`);
-                } else if (slot.status === 'failed') {
+                } else if ((slot.status as any) === 'FAILED') {
                     calculatedScore -= points;
                     failedCount++;
                     console.log(`  [FAILED]    ${slot.activity} (${slot.type}): -${points}`);
