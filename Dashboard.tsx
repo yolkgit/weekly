@@ -25,6 +25,7 @@ const CHILD_COLORS = ['indigo', 'emerald', 'rose', 'amber', 'cyan', 'purple'];
 
 import { AdSidebar } from './components/AdSidebar';
 import { AdInterstitial } from './components/AdInterstitial';
+import { AdMobileBottom } from './components/AdMobileBottom';
 
 export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ appConfig = {} }) => {
     const { user, login, logout, refreshUser } = useAuth();
@@ -100,7 +101,15 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
     const isPlanConfirmed = !!activeChild?.isPlanConfirmed;
 
     // Global UI State
-    const [isParentMode, setIsParentMode] = useState(false);
+    const [isParentMode, setLocalIsParentMode] = useState(() => {
+        return localStorage.getItem('weekly_paper_parent_mode') === 'true';
+    });
+
+    const setIsParentMode = (val: boolean) => {
+        setLocalIsParentMode(val);
+        localStorage.setItem('weekly_paper_parent_mode', String(val));
+    };
+
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [aiAdvice, setAiAdvice] = useState<string | null>(null);
     const [loadingAi, setLoadingAi] = useState(false);
@@ -259,6 +268,12 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             if (password === correctPass) {
                 setIsParentMode(true);
                 setIsSecurityModalOpen(false);
+
+                if (password === "0000") {
+                    alert("현재 초기 비밀번호('0000')를 사용 중입니다. 안전을 위해 비밀번호를 4~8자리로 변경해 주세요.");
+                    setSecurityAction('setup');
+                    setIsSecurityModalOpen(true);
+                }
             } else {
                 alert("비밀번호가 틀렸습니다.");
             }
@@ -377,10 +392,9 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
 
     const formatReward = (points: number, short = false) => {
         if (rewardMode === 'time') {
-            const h = Math.floor(Math.max(0, points) / 60);
-            const m = Math.max(0, points) % 60;
-            if (short) return `${h}h ${m}m`;
-            return `${h}시간 ${m}분`;
+            const m = Math.max(0, points);
+            if (short) return `${m}m`;
+            return `${m}분`;
         } else {
             return `${points} ${currencyUnit}`;
         }
@@ -666,9 +680,9 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                             user?.premiumStatus === 'PENDING' ? (
                                 <button
                                     disabled
-                                    className="hidden sm:flex items-center gap-1 bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full text-xs font-bold cursor-not-allowed"
+                                    className="flex items-center gap-1 bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full text-xs font-bold cursor-not-allowed"
                                 >
-                                    <Clock size={14} /> 후원 확인 중
+                                    <Clock size={14} /> <span className="hidden lg:inline">후원 확인 중</span>
                                 </button>
                             ) : (
                                 <button
@@ -677,9 +691,9 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                                             setIsPaymentModalOpen(true);
                                         }
                                     }}
-                                    className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-pink-300 to-rose-400 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
+                                    className="flex items-center gap-1 bg-gradient-to-r from-pink-300 to-rose-400 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-md transition-all animate-pulse"
                                 >
-                                    <Heart size={14} fill="white" /> 개발자 후원 (광고제거)
+                                    <Heart size={14} fill="white" /> <span className="hidden lg:inline">개발자 후원 (광고제거)</span>
                                 </button>
                             )
                         )}
@@ -697,10 +711,10 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                             className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-full border border-indigo-100 transition-colors cursor-pointer group"
                         >
                             {rewardMode === 'time' ? <Gamepad2 size={18} className="text-indigo-600 group-hover:scale-110 transition-transform" /> : <Coins size={18} className="text-indigo-600 group-hover:scale-110 transition-transform" />}
-                            <span className="text-sm font-semibold text-indigo-700 hidden sm:inline">
+                            <span className="text-sm font-semibold text-indigo-700 hidden lg:inline">
                                 {formatReward(currentBalance)} 남음
                             </span>
-                            <span className="text-sm font-semibold text-indigo-700 sm:hidden">
+                            <span className="text-sm font-semibold text-indigo-700 lg:hidden">
                                 {formatReward(currentBalance, true)}
                             </span>
                         </button>
@@ -717,7 +731,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isParentMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             {isParentMode ? <UserCog size={16} /> : <User size={16} />}
-                            <span className="hidden sm:inline">{isParentMode ? '부모님 모드' : '아이 모드'}</span>
+                            <span className="hidden lg:inline">{isParentMode ? '부모님 모드' : '아이 모드'}</span>
                         </button>
                         <button
                             onClick={logout}
@@ -731,7 +745,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             </nav>
 
             {/* Capture Root: Contains elements to be printed */}
-            <div id="capture-root">
+            <div id="capture-root" className="pb-[70px] xl:pb-0 print:pb-0 print:m-0">
                 {/* Print Header (Visible ONLY during capture/print via 'print-only' logic) */}
                 <div className="print-only text-center mb-4 pt-4 px-4">
                     <h1 className="text-2xl font-black text-slate-900 mb-1">Weekly Paper: {activeChild.name}의 주간 계획표</h1>
@@ -1147,6 +1161,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
 
 
             <SecurityKeypad
+                key={securityAction}
                 isOpen={isSecurityModalOpen}
                 onClose={() => setIsSecurityModalOpen(false)}
                 onConfirm={handleSecurityConfirm}
@@ -1157,6 +1172,7 @@ export const Dashboard: React.FC<{ appConfig?: Record<string, string> }> = ({ ap
             {/* Ads */}
             <AdSidebar side="left" config={appConfig} isPremium={!!user?.isPremium} />
             <AdSidebar side="right" config={appConfig} isPremium={!!user?.isPremium} />
+            <AdMobileBottom config={appConfig} isPremium={!!user?.isPremium} />
 
             {/* Payment Modal */}
             {isPaymentModalOpen && (

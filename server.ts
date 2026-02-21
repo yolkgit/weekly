@@ -59,7 +59,7 @@ app.post('/api/auth/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         console.log("Generating initial parent password...");
-        const initialParentPassword = Math.floor(1000 + Math.random() * 9000).toString();
+        const initialParentPassword = "0000";
 
         console.log("Creating user in DB...");
         const user = await prisma.user.create({
@@ -70,7 +70,7 @@ app.post('/api/auth/signup', async (req, res) => {
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
 
         console.log("Signup successful!");
-        res.json({ token, user: { id: user.id, email: user.email } });
+        res.json({ token, user: { id: user.id, email: user.email, parentPassword: "0000" } });
     } catch (e: any) {
         console.error("Signup Error:", e);
         res.status(500).json({ error: 'Signup failed: ' + (e.message || String(e)) });
@@ -567,7 +567,7 @@ app.post('/api/admin/config', async (req, res) => {
     if (password !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
-    const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR, AD_SIDEBAR_WIDTH, AD_SIDEBAR_HEIGHT, AD_SIDEBAR_MARGIN, AD_SIDEBAR_TOP, ADSENSE_INTERSTITIAL_ID, COUPANG_INTERSTITIAL_HTML, AD_INTERSTITIAL_TIMER, AD_INTERSTITIAL_WIDTH, AD_INTERSTITIAL_HEIGHT } = req.body;
+    const { ADS_ENABLED, ADSENSE_SLOT_ID, COUPANG_BANNER_HTML, KAKAO_PAY_QR, AD_SIDEBAR_WIDTH, AD_SIDEBAR_HEIGHT, AD_SIDEBAR_MARGIN, AD_SIDEBAR_TOP, ADSENSE_INTERSTITIAL_ID, COUPANG_INTERSTITIAL_HTML, AD_INTERSTITIAL_TIMER, AD_INTERSTITIAL_WIDTH, AD_INTERSTITIAL_HEIGHT, COUPANG_MOBILE_HTML, ADSENSE_MOBILE_ID } = req.body;
 
     try {
         if (ADS_ENABLED !== undefined) await prisma.appConfig.upsert({ where: { key: 'ADS_ENABLED' }, update: { value: ADS_ENABLED }, create: { key: 'ADS_ENABLED', value: ADS_ENABLED } });
@@ -583,6 +583,8 @@ app.post('/api/admin/config', async (req, res) => {
         if (AD_INTERSTITIAL_TIMER !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_TIMER' }, update: { value: AD_INTERSTITIAL_TIMER }, create: { key: 'AD_INTERSTITIAL_TIMER', value: AD_INTERSTITIAL_TIMER } });
         if (AD_INTERSTITIAL_WIDTH !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_WIDTH' }, update: { value: AD_INTERSTITIAL_WIDTH }, create: { key: 'AD_INTERSTITIAL_WIDTH', value: AD_INTERSTITIAL_WIDTH } });
         if (AD_INTERSTITIAL_HEIGHT !== undefined) await prisma.appConfig.upsert({ where: { key: 'AD_INTERSTITIAL_HEIGHT' }, update: { value: AD_INTERSTITIAL_HEIGHT }, create: { key: 'AD_INTERSTITIAL_HEIGHT', value: AD_INTERSTITIAL_HEIGHT } });
+        if (COUPANG_MOBILE_HTML !== undefined) await prisma.appConfig.upsert({ where: { key: 'COUPANG_MOBILE_HTML' }, update: { value: COUPANG_MOBILE_HTML }, create: { key: 'COUPANG_MOBILE_HTML', value: COUPANG_MOBILE_HTML } });
+        if (ADSENSE_MOBILE_ID !== undefined) await prisma.appConfig.upsert({ where: { key: 'ADSENSE_MOBILE_ID' }, update: { value: ADSENSE_MOBILE_ID }, create: { key: 'ADSENSE_MOBILE_ID', value: ADSENSE_MOBILE_ID } });
 
         res.json({ success: true });
     } catch (e) {
@@ -657,6 +659,74 @@ app.post('/api/admin/revoke-donation', async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: 'Failed to revoke' });
+    }
+});
+
+// --- Admin User Management API ---
+app.post('/api/admin/users/list', async (req, res) => {
+    const { password } = req.body;
+    if (password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                email: true,
+                isPremium: true,
+                premiumStatus: true,
+                createdAt: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(users);
+    } catch (e: any) {
+        console.error("Error fetching admin user list:", e);
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+app.post('/api/admin/users/:id/reset-password', async (req, res) => {
+    const { password } = req.body;
+    const userId = req.params.id;
+
+    if (password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const hashedLoginPassword = await bcrypt.hash("123456", 10);
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedLoginPassword,
+                parentPassword: "0000"
+            }
+        });
+        res.json({ success: true, message: 'Password reset to 123456 (Parent: 0000)' });
+    } catch (e: any) {
+        console.error(`Error resetting password for user ${userId}:`, e);
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
+});
+
+app.delete('/api/admin/users/:id', async (req, res) => {
+    const { password } = req.body;
+    const userId = req.params.id;
+
+    if (password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        await prisma.user.delete({
+            where: { id: userId }
+        });
+        res.json({ success: true, message: 'User permanently deleted' });
+    } catch (e: any) {
+        console.error(`Error deleting user ${userId}:`, e);
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 

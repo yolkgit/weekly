@@ -39,8 +39,8 @@ export const AdSidebar: React.FC<AdSidebarProps> = ({ side, config, isPremium })
                 width: width.endsWith('px') || width.endsWith('%') ? width : `${width}px`,
                 height: height.endsWith('px') || height.endsWith('%') ? height : `${height}px`,
                 top: top.endsWith('px') || top.endsWith('%') ? top : `${top}px`,
-                left: side === 'left' ? (margin.endsWith('px') || margin.endsWith('%') ? margin : `${margin}px`) : 'auto',
-                right: side === 'right' ? (margin.endsWith('px') || margin.endsWith('%') ? margin : `${margin}px`) : 'auto',
+                left: side === 'right' ? `calc(50% + 576px + ${margin.endsWith('px') || margin.endsWith('%') ? margin : `${margin}px`})` : 'auto',
+                right: side === 'left' ? `calc(50% + 576px + ${margin.endsWith('px') || margin.endsWith('%') ? margin : `${margin}px`})` : 'auto',
                 transform: top.includes('%') ? 'translateY(-50%)' : 'none'
             }}
         >

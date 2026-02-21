@@ -146,8 +146,8 @@ export const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, onSlotClic
         {/* Rows */}
         {timeRange.map(time => (
           <div key={time} className="grid grid-cols-8 gap-1 mb-1 h-10 pdf-row">
-            <div className={`flex items-center justify-center font-medium text-slate-400 bg-slate-50 rounded-md print:border print:border-slate-200 pdf-cell ${timeSize}`}>
-              <span className="pdf-cell-text">{time}</span>
+            <div className={`flex items-start justify-center pt-1 text-center font-medium text-slate-400 bg-slate-50 rounded-md print:flex print:items-start print:justify-center print:pt-1 print:border print:border-slate-200 w-full ${timeSize}`}>
+              <span className="w-full block text-center">{time}</span>
             </div>
             {DAYS.map((_, dayIdx) => {
               const slot = schedule.find(s => s.dayIndex === dayIdx && s.startTime === time);

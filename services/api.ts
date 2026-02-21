@@ -229,6 +229,36 @@ export const api = {
         return res.json();
     },
 
+    adminGetUsers: async (password: string) => {
+        const res = await fetch(`${API_BASE}/admin/users/list`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        if (!res.ok) throw new Error('Failed to fetch users');
+        return res.json();
+    },
+
+    adminResetUserPassword: async (password: string, userId: string) => {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        if (!res.ok) throw new Error('Failed to reset password');
+        return res.json();
+    },
+
+    adminDeleteUser: async (password: string, userId: string) => {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        if (!res.ok) throw new Error('Failed to delete user');
+        return res.json();
+    },
+
     // --- Premium ---
     getUserInfo: async () => {
         const res = await fetch(`${API_BASE}/user/me`, { headers: getHeaders() });
